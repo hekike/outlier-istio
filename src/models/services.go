@@ -13,7 +13,7 @@ import (
 
 const reqsFmt = "sum(rate(istio_requests_total{reporter=\"destination\"}[%s])) by (source_workload, destination_workload, source_app, destination_app)"
 
-/*Service struct.*/
+// Service struct.
 type Service struct {
 	Name       string   `json:"name"`
 	Downstream []string `json:"downstream"`
@@ -24,7 +24,7 @@ func (srv *Service) addDownstream(item string) []string {
 	return srv.Downstream
 }
 
-/*GetServices returns the services.*/
+// GetServices returns the services.
 func GetServices(addr string) (map[string]Service, error) {
 	client, err := promApi.NewClient(promApi.Config{Address: addr})
 	if err != nil {
