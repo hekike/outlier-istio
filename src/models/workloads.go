@@ -21,18 +21,18 @@ type WorkloadItem struct {
 // Workload struct.
 type Workload struct {
 	WorkloadItem
-	SourceWorkloads      []WorkloadItem `json:"sourceWorkloads"`
-	DestinationWorkloads []WorkloadItem `json:"destinationWorkloads"`
+	Sources      []WorkloadItem `json:"sources"`
+	Destinations []WorkloadItem `json:"destinations"`
 }
 
 func (aw *Workload) addSource(ds WorkloadItem) []WorkloadItem {
-	aw.SourceWorkloads = append(aw.SourceWorkloads, ds)
-	return aw.SourceWorkloads
+	aw.Sources = append(aw.Sources, ds)
+	return aw.Sources
 }
 
 func (aw *Workload) addDestination(ds WorkloadItem) []WorkloadItem {
-	aw.DestinationWorkloads = append(aw.DestinationWorkloads, ds)
-	return aw.DestinationWorkloads
+	aw.Destinations = append(aw.Destinations, ds)
+	return aw.Destinations
 }
 
 // GetWorkloads returns workload with it's destination workloads
@@ -122,8 +122,8 @@ func getWorkload(
 		workload = Workload{}
 		workload.Name = name
 		workload.App = app
-		workload.SourceWorkloads = make([]WorkloadItem, 0)
-		workload.DestinationWorkloads = make([]WorkloadItem, 0)
+		workload.Sources = make([]WorkloadItem, 0)
+		workload.Destinations = make([]WorkloadItem, 0)
 	}
 	return id, workload
 }
