@@ -46,9 +46,9 @@ func main() {
 		c.String(200, "ok")
 	})
 
-	// swagger:route GET /api/v1/services service getServices
+	// swagger:route GET /api/v1/workloads workload getWorkloads
 	// ---
-	// summary: Returns with services and downstream relations.
+	// summary: Returns with destination workloads
 	// description: Returns with an array of services.
 	// produces:
 	// 	- application/json
@@ -60,15 +60,21 @@ func main() {
 	// 	200:
 	//		type: string
 	//		description: TODO
-	apiRouter.GET("/services", func(c *gin.Context) {
-		services, err := models.GetServices(addr)
+	apiRouter.GET("/workloads", func(c *gin.Context) {
+		workloads, err := models.GetWorkloads(addr)
 		if err != nil {
 			c.AbortWithError(500, err)
 			return
 		}
 
+		// Convert slice to array
+		response := make([]models.Workload, 0, len(workloads))
+		for _, workload := range workloads {
+			response = append(response, workload)
+		}
+
 		c.JSON(200, gin.H{
-			"services": services,
+			"workloads": response,
 		})
 	})
 
