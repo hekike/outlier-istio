@@ -11,6 +11,7 @@ import (
 )
 
 const workloadQuery = "sum(rate(istio_requests_total{reporter=\"destination\"}[%s])) by (source_workload, destination_workload, source_app, destination_app)"
+const appTypeMixer = "mixer"
 
 // WorkloadItem struct.
 type WorkloadItem struct {
@@ -25,19 +26,84 @@ type Workload struct {
 	Destinations []WorkloadItem `json:"destinations"`
 }
 
-func (aw *Workload) addSource(ds WorkloadItem) []WorkloadItem {
-	aw.Sources = append(aw.Sources, ds)
-	return aw.Sources
+func (w *WorkloadItem) isMixer() bool {
+	return w.App == appTypeMixer
 }
 
-func (aw *Workload) addDestination(ds WorkloadItem) []WorkloadItem {
-	aw.Destinations = append(aw.Destinations, ds)
-	return aw.Destinations
+func (w *Workload) addSource(wi WorkloadItem) []WorkloadItem {
+	w.Sources = append(w.Sources, wi)
+	return w.Sources
 }
 
-// ByNameAndApps returns workload with it's destination workloads
+func (w *Workload) addDestination(wi WorkloadItem) []WorkloadItem {
+	w.Destinations = append(w.Destinations, wi)
+	return w.Destinations
+}
+
+// GetWorkloads returns workload with it's destination workloads
 // TODO: refactor to use the same logic for adding source and destination
 func GetWorkloads(addr string) (map[string]Workload, error) {
+	// Fetch data
+	matrix, err := fetchWorkloads(addr)
+	if err != nil {
+		return nil, err
+	}
+
+	workloads := make(map[string]Workload)
+
+	// Add sources with destinations
+	for _, sample := range matrix {
+		metric := sample.Metric
+
+		// Get workload
+		var id string
+		var workload Workload
+		id, workload = getWorkloadByMetric(metric, "source", workloads)
+
+		if workload.isMixer() {
+			continue
+		}
+
+		// Add destination workload
+		destinationWorkload := WorkloadItem{
+			Name: string(metric["destination_workload"]),
+			App:  string(metric["destination_app"]),
+		}
+		if !destinationWorkload.isMixer() {
+			workload.addDestination(destinationWorkload)
+		}
+
+		workloads[id] = workload
+	}
+
+	// Add destinations with sources
+	for _, sample := range matrix {
+		metric := sample.Metric
+		// Get workload
+		var id string
+		var workload Workload
+		id, workload = getWorkloadByMetric(metric, "destination", workloads)
+
+		if workload.isMixer() {
+			continue
+		}
+
+		// Add source workload
+		sourceWorkload := WorkloadItem{
+			Name: string(metric["source_workload"]),
+			App:  string(metric["source_app"]),
+		}
+		if !sourceWorkload.isMixer() {
+			workload.addSource(sourceWorkload)
+		}
+
+		workloads[id] = workload
+	}
+
+	return workloads, nil
+}
+
+func fetchWorkloads(addr string) (promModel.Vector, error) {
 	client, err := promApi.NewClient(promApi.Config{Address: addr})
 	if err != nil {
 		return nil, err
@@ -51,69 +117,28 @@ func GetWorkloads(addr string) (map[string]Workload, error) {
 	}
 	matrix := val.(promModel.Vector)
 
-	workloads := make(map[string]Workload)
-	for _, sample := range matrix {
-		metrics := sample.Metric
-		name := string(metrics["source_workload"])
-		app := string(metrics["source_app"])
-
-		if app == "mixer" {
-			continue
-		}
-
-		var id string
-		var workload Workload
-		id, workload = getWorkloadByNameAndApp(name, app, workloads)
-
-		// Add destination workload
-		destinationWorkload := WorkloadItem{
-			Name: string(metrics["destination_workload"]),
-			App:  string(metrics["destination_app"]),
-		}
-		if destinationWorkload.App != "mixer" {
-			workload.addDestination(destinationWorkload)
-		}
-
-		workloads[id] = workload
-	}
-
-	// Add sources
-	for _, sample := range matrix {
-		metrics := sample.Metric
-		name := string(metrics["destination_workload"])
-		app := string(metrics["destination_app"])
-
-		if app == "mixer" {
-			continue
-		}
-
-		var id string
-		var workload Workload
-		id, workload = getWorkloadByNameAndApp(name, app, workloads)
-
-		// Add source workload
-		sourceWorkload := WorkloadItem{
-			Name: string(metrics["source_workload"]),
-			App:  string(metrics["source_app"]),
-		}
-		if sourceWorkload.App != "mixer" {
-			workload.addSource(sourceWorkload)
-		}
-
-		workloads[id] = workload
-	}
-
-	return workloads, nil
+	return matrix, nil
 }
 
-func getWorkloadByNameAndApp(
-	name string,
-	app string,
+func getWorkloadByMetric(
+	metric promModel.Metric,
+	sourceType string,
 	workloads map[string]Workload,
 ) (
 	id string,
 	workload Workload,
 ) {
+	// Extract data
+	var name, app string
+	if sourceType == "source" {
+		name = string(metric["source_workload"])
+		app = string(metric["source_app"])
+	} else {
+		name = string(metric["destination_workload"])
+		app = string(metric["destination_app"])
+	}
+
+	// Find or create workload
 	id = name + "-" + app
 
 	if v, found := workloads[id]; found {
