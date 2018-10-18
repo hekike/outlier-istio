@@ -35,7 +35,7 @@ func (aw *Workload) addDestination(ds WorkloadItem) []WorkloadItem {
 	return aw.Destinations
 }
 
-// GetWorkloads returns workload with it's destination workloads
+// ByNameAndApps returns workload with it's destination workloads
 // TODO: refactor to use the same logic for adding source and destination
 func GetWorkloads(addr string) (map[string]Workload, error) {
 	client, err := promApi.NewClient(promApi.Config{Address: addr})
@@ -63,7 +63,7 @@ func GetWorkloads(addr string) (map[string]Workload, error) {
 
 		var id string
 		var workload Workload
-		id, workload = getWorkload(name, app, workloads)
+		id, workload = getWorkloadByNameAndApp(name, app, workloads)
 
 		// Add destination workload
 		destinationWorkload := WorkloadItem{
@@ -89,7 +89,7 @@ func GetWorkloads(addr string) (map[string]Workload, error) {
 
 		var id string
 		var workload Workload
-		id, workload = getWorkload(name, app, workloads)
+		id, workload = getWorkloadByNameAndApp(name, app, workloads)
 
 		// Add source workload
 		sourceWorkload := WorkloadItem{
@@ -106,7 +106,7 @@ func GetWorkloads(addr string) (map[string]Workload, error) {
 	return workloads, nil
 }
 
-func getWorkload(
+func getWorkloadByNameAndApp(
 	name string,
 	app string,
 	workloads map[string]Workload,
