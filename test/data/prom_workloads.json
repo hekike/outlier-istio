@@ -5,19 +5,6 @@
            "result":[
               {
                  "metric":{
-                    "destination_app":"mixer",
-                    "destination_workload":"istio-policy",
-                    "request_protocol":"grpc",
-                    "source_app":"productpage",
-                    "source_workload":"productpage-v1"
-                 },
-                 "value":[
-                    1539917345.608,
-                    "0"
-                 ]
-              },
-              {
-                 "metric":{
                     "destination_app":"reviews",
                     "destination_workload":"reviews-v3",
                     "request_protocol":"http",

@@ -10,8 +10,22 @@ import (
 	promModel "github.com/prometheus/common/model"
 )
 
-const workloadQuery = "sum(rate(istio_requests_total{reporter=\"destination\"}[%s])) by (source_workload, destination_workload, source_app, destination_app)"
-const appTypeMixer = "mixer"
+const workloadQuery = `
+	sum(
+		rate(
+			istio_requests_total {
+				reporter = "destination",
+				source_app != "mixer",
+				destination_app != "mixer"
+			}[%s]
+		)
+	) by (
+		source_workload,
+		destination_workload,
+		source_app,
+		destination_app
+	)
+`
 
 // WorkloadItem struct.
 type WorkloadItem struct {
@@ -24,10 +38,6 @@ type Workload struct {
 	WorkloadItem
 	Sources      []WorkloadItem `json:"sources"`
 	Destinations []WorkloadItem `json:"destinations"`
-}
-
-func (w *WorkloadItem) isMixer() bool {
-	return w.App == appTypeMixer
 }
 
 // AddSource adds a source workload
@@ -62,18 +72,12 @@ func GetWorkloads(addr string) (map[string]Workload, error) {
 		var workload Workload
 		id, workload = getWorkloadByMetric(metric, "source", workloads)
 
-		if workload.isMixer() {
-			continue
-		}
-
 		// Add destination workload
 		destinationWorkload := WorkloadItem{
 			Name: string(metric["destination_workload"]),
 			App:  string(metric["destination_app"]),
 		}
-		if !destinationWorkload.isMixer() {
-			workload.AddDestination(destinationWorkload)
-		}
+		workload.AddDestination(destinationWorkload)
 
 		workloads[id] = workload
 	}
@@ -86,18 +90,12 @@ func GetWorkloads(addr string) (map[string]Workload, error) {
 		var workload Workload
 		id, workload = getWorkloadByMetric(metric, "destination", workloads)
 
-		if workload.isMixer() {
-			continue
-		}
-
 		// Add source workload
 		sourceWorkload := WorkloadItem{
 			Name: string(metric["source_workload"]),
 			App:  string(metric["source_app"]),
 		}
-		if !sourceWorkload.isMixer() {
-			workload.AddSource(sourceWorkload)
-		}
+		workload.AddSource(sourceWorkload)
 
 		workloads[id] = workload
 	}
