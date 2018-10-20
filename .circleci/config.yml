@@ -3,7 +3,7 @@ jobs:
   build:
     docker:
       - image: golang:1.11
-    working_directory: /go/src/github.com/{{ORG_NAME}}/{{REPO_NAME}}
+    working_directory: /go/src/github.com/hekike/outlier-istio
     steps:
       - checkout
       - run: go get -u
