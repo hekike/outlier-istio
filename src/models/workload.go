@@ -30,12 +30,14 @@ func (w *WorkloadItem) isMixer() bool {
 	return w.App == appTypeMixer
 }
 
-func (w *Workload) addSource(wi WorkloadItem) []WorkloadItem {
+// AddSource adds a source workload
+func (w *Workload) AddSource(wi WorkloadItem) []WorkloadItem {
 	w.Sources = append(w.Sources, wi)
 	return w.Sources
 }
 
-func (w *Workload) addDestination(wi WorkloadItem) []WorkloadItem {
+// AddDestination adds a destination workload
+func (w *Workload) AddDestination(wi WorkloadItem) []WorkloadItem {
 	w.Destinations = append(w.Destinations, wi)
 	return w.Destinations
 }
@@ -70,7 +72,7 @@ func GetWorkloads(addr string) (map[string]Workload, error) {
 			App:  string(metric["destination_app"]),
 		}
 		if !destinationWorkload.isMixer() {
-			workload.addDestination(destinationWorkload)
+			workload.AddDestination(destinationWorkload)
 		}
 
 		workloads[id] = workload
@@ -94,7 +96,7 @@ func GetWorkloads(addr string) (map[string]Workload, error) {
 			App:  string(metric["source_app"]),
 		}
 		if !sourceWorkload.isMixer() {
-			workload.addSource(sourceWorkload)
+			workload.AddSource(sourceWorkload)
 		}
 
 		workloads[id] = workload

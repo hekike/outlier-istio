@@ -21,6 +21,11 @@ import (
 	"github.com/hekike/outlier-istio/src/models"
 )
 
+// APIResponseWorkloads struct.
+type APIResponseWorkloads struct {
+	Workloads []models.Workload `json:"workloads"`
+}
+
 // Setup router
 func Setup(promAddr string) *gin.Engine {
 	router := gin.Default()
@@ -61,21 +66,21 @@ func Setup(promAddr string) *gin.Engine {
 	//		type: string
 	//		description: TODO
 	apiRouter.GET("/workloads", func(c *gin.Context) {
-		workloads, err := models.GetWorkloads(promAddr)
+		workloadsMap, err := models.GetWorkloads(promAddr)
 		if err != nil {
 			c.AbortWithError(500, err)
 			return
 		}
 
 		// Convert slice to array
-		response := make([]models.Workload, 0, len(workloads))
-		for _, workload := range workloads {
-			response = append(response, workload)
+		workloads := make([]models.Workload, 0, len(workloadsMap))
+		for _, workload := range workloadsMap {
+			workloads = append(workloads, workload)
 		}
 
-		c.JSON(200, gin.H{
-			"workloads": response,
-		})
+		response := APIResponseWorkloads{Workloads: workloads}
+
+		c.JSON(200, response)
 	})
 
 	return router
