@@ -83,5 +83,30 @@ func Setup(promAddr string) *gin.Engine {
 		c.JSON(200, response)
 	})
 
+	// swagger:route GET /api/v1/workloads workload getWorkloads
+	// ---
+	// summary: Returns with destination workloads
+	// description: Returns with an array of services.
+	// produces:
+	// 	- application/json
+	// schemes:
+	// 	- http
+	// responses:
+	// 	default:
+	//		description: Unexpected error
+	// 	200:
+	//		type: string
+	//		description: TODO
+	apiRouter.GET("/workloads/:name/status", func(c *gin.Context) {
+		name := c.Param("name")
+		workload, err := models.GetWorkloadStatusByName(promAddr, name)
+		if err != nil {
+			c.AbortWithError(500, err)
+			return
+		}
+
+		c.JSON(200, workload)
+	})
+
 	return router
 }
