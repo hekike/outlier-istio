@@ -17,6 +17,8 @@
 package router
 
 import (
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/hekike/outlier-istio/src/models"
 )
@@ -99,7 +101,10 @@ func Setup(promAddr string) *gin.Engine {
 	//		description: TODO
 	apiRouter.GET("/workloads/:name/status", func(c *gin.Context) {
 		name := c.Param("name")
-		workload, err := models.GetWorkloadStatusByName(promAddr, name)
+		end := time.Now()
+		start := end.Add(10 * -time.Minute)
+
+		workload, err := models.GetWorkloadStatusByName(promAddr, name, start, end)
 		if err != nil {
 			c.AbortWithError(500, err)
 			return

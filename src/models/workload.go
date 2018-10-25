@@ -27,28 +27,6 @@ const workloadQuery = `
 	)
 `
 
-const destinationWorkloadRequestDurationPercentiles = `
-	histogram_quantile(
-		0.95,
-		sum(
-			rate(
-				istio_request_duration_seconds_bucket {
-					reporter = "destination",
-					source_workload = "%s",
-					destination_app != "mixer"
-				}[%s]
-			)
-		) by (
-			le,
-			request_protocol,
-			source_workload,
-			source_app,
-			destination_workload,
-			destination_app
-		)
-	)
-`
-
 // WorkloadStatus struct.
 type WorkloadStatus struct {
 	Time   time.Time `json:"date"`
@@ -57,11 +35,11 @@ type WorkloadStatus struct {
 
 // Workload struct.
 type Workload struct {
-	Name         string           `json:"name"`          // name of the workload
-	App          string           `json:"app,omitempty"` // istio app
-	Sources      []Workload       `json:"sources"`
-	Destinations []Workload       `json:"destinations"`
-	Statuses     []WorkloadStatus `json:"statuses,omitempty"`
+	Name         string                 `json:"name"`          // name of the workload
+	App          string                 `json:"app,omitempty"` // istio app
+	Sources      []Workload             `json:"sources"`
+	Destinations []Workload             `json:"destinations"`
+	Statuses     []AggregatedStatusItem `json:"statuses,omitempty"`
 }
 
 // AddSource adds a source workload
@@ -127,61 +105,6 @@ func GetWorkloads(addr string) (map[string]Workload, error) {
 	return workloads, nil
 }
 
-// GetWorkloadStatusByName returns a single workload with it's status
-func GetWorkloadStatusByName(addr string, name string) (*Workload, error) {
-	// Fetch data
-	query := fmt.Sprintf(
-		destinationWorkloadRequestDurationPercentiles,
-		"productpage-v1",
-		"60s",
-	)
-	matrix, err := fetchQueryRange(addr, query)
-
-	if err != nil {
-		return nil, err
-	}
-
-	// Process data
-	workload := Workload{}
-	workload.Name = name
-	workload.Statuses = make([]WorkloadStatus, 0)
-
-	for _, sampleStream := range matrix {
-		metric := sampleStream.Metric
-		values := sampleStream.Values
-
-		destinationWorkload := Workload{
-			Name:     string(metric["destination_workload"]),
-			App:      string(metric["destination_app"]),
-			Statuses: make([]WorkloadStatus, 0),
-		}
-
-		for _, samplePair := range values {
-			status := "unknown"
-
-			if samplePair.Value > 0 {
-				status = "ok"
-			}
-
-			t := samplePair.Timestamp.Time()
-			workloadStatus := WorkloadStatus{
-				Time:   t,
-				Status: status,
-			}
-
-			destinationWorkload.Statuses = append(
-				destinationWorkload.Statuses,
-				workloadStatus,
-			)
-
-		}
-
-		workload.AddDestination(destinationWorkload)
-	}
-
-	return &workload, nil
-}
-
 func fetchQuery(addr string, pq string) (promModel.Vector, error) {
 	client, err := promApi.NewClient(promApi.Config{Address: addr})
 	if err != nil {
@@ -194,29 +117,6 @@ func fetchQuery(addr string, pq string) (promModel.Vector, error) {
 		return nil, err
 	}
 	matrix := val.(promModel.Vector)
-
-	return matrix, nil
-}
-
-func fetchQueryRange(addr string, pq string) (promModel.Matrix, error) {
-	client, err := promApi.NewClient(promApi.Config{Address: addr})
-	if err != nil {
-		return nil, err
-	}
-	api := promApiV1.NewAPI(client)
-
-	// Query range
-	queryTime := time.Now()
-	queryRange := promApiV1.Range{
-		Start: queryTime.Add(10 * -time.Minute),
-		End:   queryTime,
-		Step:  time.Minute,
-	}
-	val, err := api.QueryRange(context.Background(), pq, queryRange)
-	if err != nil {
-		return nil, err
-	}
-	matrix := val.(promModel.Matrix)
 
 	return matrix, nil
 }

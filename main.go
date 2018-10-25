@@ -4,7 +4,7 @@ import (
 	"github.com/hekike/outlier-istio/src"
 )
 
-const promAddr = "http://192.168.99.100:30900"
+const promAddr = "http://localhost:9090"
 
 func main() {
 	router := router.Setup(promAddr)
