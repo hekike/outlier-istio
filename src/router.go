@@ -102,9 +102,18 @@ func Setup(promAddr string) *gin.Engine {
 	apiRouter.GET("/workloads/:name/status", func(c *gin.Context) {
 		name := c.Param("name")
 		end := time.Now()
-		start := end.Add(10 * -time.Minute)
+		start := end.Add(-time.Hour)
+		historical := 60 * time.Minute
+		statusStep := 5 * time.Minute
 
-		workload, err := models.GetWorkloadStatusByName(promAddr, name, start, end)
+		workload, err := models.GetWorkloadStatusByName(
+			promAddr,
+			name,
+			start,
+			end,
+			historical,
+			statusStep,
+		)
 		if err != nil {
 			c.AbortWithError(500, err)
 			return

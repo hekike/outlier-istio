@@ -38,19 +38,27 @@ const destinationWorkloadRequestDurationPercentiles = `
 	)
 `
 
+// 0.1 millisecond accuracy (results are in second)
+const decimals = 10000
+
+// data resolution in Prometheus (Istio default is 5s)
+const resolutionStep = 5 * time.Second
+
 // AggregatedStatus calculates status.
 type AggregatedStatus struct {
+	Step   time.Duration
 	Status map[int64]AggregatedStatusItem
 }
 
 // AggregatedStatusItem holds the status.
 type AggregatedStatusItem struct {
-	Time              time.Time `json:"date"`
-	Status            string    `json:"status"`
-	ApproximateMedian float64   `json:"approximateMedian"`
-	Avg               float64   `json:"avg"`
-	Median            float64   `json:"median"`
-	Values            []float64 `json:"-"`
+	Time   time.Time `json:"date"`
+	Status string    `json:"status"`
+	Values []float64 `json:"-"`
+	// pointer as they can be JSON null
+	ApproximateMedian *float64 `json:"approximateMedian"`
+	Avg               *float64 `json:"avg"`
+	Median            *float64 `json:"median"`
 }
 
 type unixTimeRange []int64
@@ -67,7 +75,7 @@ func (as *AggregatedStatus) AddStatus(
 	v float64,
 ) map[int64]AggregatedStatusItem {
 	var statusItem AggregatedStatusItem
-	roundedTime := t.Round(time.Minute)
+	roundedTime := t.Round(as.Step)
 	key := roundedTime.Unix()
 
 	if v, found := as.Status[key]; found {
@@ -78,6 +86,8 @@ func (as *AggregatedStatus) AddStatus(
 			Status: "unknown",
 		}
 	}
+
+	fmt.Println(v)
 
 	// TODO: is it valid to skip?
 	if !math.IsNaN(v) {
@@ -92,40 +102,51 @@ func (as *AggregatedStatus) AddStatus(
 func (as *AggregatedStatus) Aggregate(hsv sampleValues) []AggregatedStatusItem {
 	statusItems := make([]AggregatedStatusItem, 0, len(as.Status))
 
+	// Sort statuses by time
 	keys := unixTimeRange{}
 	for k := range as.Status {
 		keys = append(keys, k)
 	}
 	sort.Sort(keys)
 
-	// To perform the opertion you want
+	// Process statuses
 	for _, k := range keys {
 		statusItem := as.Status[k]
 
+		// Do not process status with less than three values
 		if len(statusItem.Values) < 3 {
 			statusItems = append(statusItems, statusItem)
 			continue
 		}
 
-		am := utils.ApproximateMedian(hsv)
 		avg := utils.Avg(statusItem.Values)
 		median, err := stats.Median(statusItem.Values)
+
+		// Calculate approximate median and add current window's values
+		// for the moving window
+		am := utils.ApproximateMedian(hsv)
+		for _, v := range statusItem.Values {
+			hsv = append(hsv, v)
+		}
 
 		if err != nil {
 			panic(err)
 		}
 
-		statusItem.ApproximateMedian = math.Round(am*1000) / 1000
-		statusItem.Avg = math.Round(avg*1000) / 1000
-		statusItem.Median = math.Round(median*1000) / 1000
+		amFormatted := math.Round(am*decimals) / decimals
+		avgFormatted := math.Round(avg*decimals) / decimals
+		medianFormatted := math.Round(median*decimals) / decimals
 
-		if statusItem.Median > statusItem.ApproximateMedian {
+		statusItem.ApproximateMedian = &amFormatted
+		statusItem.Avg = &avgFormatted
+		statusItem.Median = &medianFormatted
+
+		if medianFormatted > amFormatted {
 			statusItem.Status = "high"
 		} else {
 			statusItem.Status = "ok"
 		}
 
-		hsv = append(hsv, median)
 		statusItems = append(statusItems, statusItem)
 	}
 	return statusItems
@@ -137,6 +158,8 @@ func GetWorkloadStatusByName(
 	name string,
 	start time.Time,
 	end time.Time,
+	historical time.Duration,
+	statusStep time.Duration,
 ) (*Workload, error) {
 	// Fetch data
 	query := fmt.Sprintf(
@@ -145,7 +168,7 @@ func GetWorkloadStatusByName(
 		"60s",
 	)
 
-	historicalStart := start.Add(-10 * time.Minute)
+	historicalStart := start.Add(-historical)
 
 	matrix, err := fetchQueryRange(addr, historicalStart, end, query)
 
@@ -164,6 +187,7 @@ func GetWorkloadStatusByName(
 		historicalSampleValues := sampleValues{}
 
 		aggregatedStatus := AggregatedStatus{
+			Step:   statusStep,
 			Status: make(map[int64]AggregatedStatusItem),
 		}
 
@@ -220,7 +244,7 @@ func fetchQueryRange(
 	queryRange := promApiV1.Range{
 		Start: start,
 		End:   end,
-		Step:  5 * time.Second,
+		Step:  resolutionStep,
 	}
 	val, err := api.QueryRange(context.Background(), pq, queryRange)
 	if err != nil {
