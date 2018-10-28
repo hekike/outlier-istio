@@ -23,7 +23,7 @@ func TestApiGetWorkloadStatus(t *testing.T) {
 	server := httptest.NewServer(testRouter)
 
 	// call api
-	workloadsURL := server.URL + "/api/v1/workloads/" + workloadName + "/status"
+	workloadsURL := server.URL + "/api/v1/workloads/" + workloadName + "/status?end=2018-10-27T15:00:00Z"
 	res, body := fixtures.HTTPRequest(t, workloadsURL)
 
 	workloadsResponse := models.Workload{}
@@ -42,17 +42,15 @@ func TestApiGetWorkloadStatus(t *testing.T) {
 	assert.Equal(t, "details", detailsV1.App)
 
 	statuses := make([]string, len(detailsV1.Statuses))
-	ams := make([]*float64, len(detailsV1.Statuses))
 
 	for i, status := range detailsV1.Statuses {
 		statuses[i] = status.Status
-		ams = append(ams, status.ApproximateMedian)
 	}
 
-	// TODO: why not 12 items? (why only ~30 mins)
 	assert.Equal(t, []string{
-		"ok", "high", "high", "high", "ok",
+		"high", "ok", "ok", "ok",
+		"ok", "high", "ok", "high",
+		"ok", "high", "ok", "ok",
+		"high", "high", "high", "ok",
 	}, statuses)
-
-	// TODO: check for ams
 }

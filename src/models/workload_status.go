@@ -111,6 +111,7 @@ func (as *AggregatedStatus) Aggregate(hsv utils.SliceFloat64) []AggregatedStatus
 		statusItem := as.Status[k]
 
 		if len(statusItem.Values) == 0 {
+			statusItems = append(statusItems, statusItem)
 			continue
 		}
 
@@ -166,6 +167,8 @@ func GetWorkloadStatusByName(
 	historical time.Duration,
 	statusStep time.Duration,
 ) (*Workload, error) {
+	historicalStart := start.Add(-historical)
+
 	// Fetch data
 	query := fmt.Sprintf(
 		destinationWorkloadRequestDurationPercentiles,
@@ -173,10 +176,7 @@ func GetWorkloadStatusByName(
 		"60s",
 	)
 
-	historicalStart := start.Add(-historical)
-
 	matrix, err := fetchQueryRange(addr, historicalStart, end, query)
-
 	if err != nil {
 		return nil, err
 	}

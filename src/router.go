@@ -99,18 +99,37 @@ func Setup(promAddr string) *gin.Engine {
 	// 	200:
 	//		type: string
 	//		description: TODO
+	type Status struct {
+		Start time.Time `form:"start" time_format:"2006-01-02T15:04:05Z07:00"`
+		End   time.Time `form:"end" time_format:"2006-01-02T15:04:05Z07:00"`
+	}
+
 	apiRouter.GET("/workloads/:name/status", func(c *gin.Context) {
 		name := c.Param("name")
-		end := time.Now()
-		start := end.Add(-time.Hour)
+
+		// Bind query string parameters
+		var status Status
+		err := c.ShouldBindQuery(&status)
+		if err != nil {
+			c.AbortWithError(500, err)
+			return
+		}
+
+		if status.End.IsZero() {
+			status.End = time.Now()
+		}
+		if status.Start.IsZero() {
+			status.Start = status.End.Add(-time.Hour)
+		}
+
 		historical := 15 * time.Minute
 		statusStep := 5 * time.Minute
 
 		workload, err := models.GetWorkloadStatusByName(
 			promAddr,
 			name,
-			start,
-			end,
+			status.Start,
+			status.End,
 			historical,
 			statusStep,
 		)
