@@ -61,13 +61,11 @@ type AggregatedStatusItem struct {
 	Median            *float64 `json:"median"`
 }
 
-type unixTimeRange []int64
+type sliceInt64 []int64
 
-func (a unixTimeRange) Len() int           { return len(a) }
-func (a unixTimeRange) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a unixTimeRange) Less(i, j int) bool { return a[i] < a[j] }
-
-type sampleValues []float64
+func (a sliceInt64) Len() int           { return len(a) }
+func (a sliceInt64) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a sliceInt64) Less(i, j int) bool { return a[i] < a[j] }
 
 // AddStatus adds a new workload status.
 func (as *AggregatedStatus) AddStatus(
@@ -78,16 +76,15 @@ func (as *AggregatedStatus) AddStatus(
 	roundedTime := t.Round(as.Step)
 	key := roundedTime.Unix()
 
-	if v, found := as.Status[key]; found {
-		statusItem = v
+	if _statusItem, found := as.Status[key]; found {
+		statusItem = _statusItem
 	} else {
 		statusItem = AggregatedStatusItem{
 			Time:   roundedTime,
 			Status: "unknown",
+			Values: make([]float64, 0),
 		}
 	}
-
-	fmt.Println(v)
 
 	// TODO: is it valid to skip?
 	if !math.IsNaN(v) {
@@ -99,11 +96,11 @@ func (as *AggregatedStatus) AddStatus(
 }
 
 // Aggregate turns the map to an aggregated array.
-func (as *AggregatedStatus) Aggregate(hsv sampleValues) []AggregatedStatusItem {
+func (as *AggregatedStatus) Aggregate(hsv utils.SliceFloat64) []AggregatedStatusItem {
 	statusItems := make([]AggregatedStatusItem, 0, len(as.Status))
 
 	// Sort statuses by time
-	keys := unixTimeRange{}
+	keys := sliceInt64{}
 	for k := range as.Status {
 		keys = append(keys, k)
 	}
@@ -113,33 +110,41 @@ func (as *AggregatedStatus) Aggregate(hsv sampleValues) []AggregatedStatusItem {
 	for _, k := range keys {
 		statusItem := as.Status[k]
 
-		// Do not process status with less than three values
-		if len(statusItem.Values) < 3 {
-			statusItems = append(statusItems, statusItem)
+		if len(statusItem.Values) == 0 {
 			continue
 		}
 
 		avg := utils.Avg(statusItem.Values)
+
 		median, err := stats.Median(statusItem.Values)
+		if err != nil {
+			panic(err)
+		}
 
 		// Calculate approximate median and add current window's values
 		// for the moving window
-		am := utils.ApproximateMedian(hsv)
+		var am float64
+
+		if len(hsv) > 5 {
+			am = utils.ApproximateMedian(hsv)
+		}
 		for _, v := range statusItem.Values {
 			hsv = append(hsv, v)
-		}
-
-		if err != nil {
-			panic(err)
 		}
 
 		amFormatted := math.Round(am*decimals) / decimals
 		avgFormatted := math.Round(avg*decimals) / decimals
 		medianFormatted := math.Round(median*decimals) / decimals
 
-		statusItem.ApproximateMedian = &amFormatted
-		statusItem.Avg = &avgFormatted
-		statusItem.Median = &medianFormatted
+		if !math.IsNaN(amFormatted) {
+			statusItem.ApproximateMedian = &amFormatted
+		}
+		if !math.IsNaN(avgFormatted) {
+			statusItem.Avg = &avgFormatted
+		}
+		if !math.IsNaN(medianFormatted) {
+			statusItem.Median = &medianFormatted
+		}
 
 		if medianFormatted > amFormatted {
 			statusItem.Status = "high"
@@ -184,7 +189,7 @@ func GetWorkloadStatusByName(
 	for _, sampleStream := range matrix {
 		metric := sampleStream.Metric
 		values := sampleStream.Values
-		historicalSampleValues := sampleValues{}
+		historicalSampleValues := utils.SliceFloat64{}
 
 		aggregatedStatus := AggregatedStatus{
 			Step:   statusStep,

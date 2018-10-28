@@ -4,9 +4,15 @@ import (
 	"math"
 )
 
+type SliceFloat64 []float64
+
+func (a SliceFloat64) Len() int           { return len(a) }
+func (a SliceFloat64) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a SliceFloat64) Less(i, j int) bool { return a[i] < a[j] }
+
 // ApproximateMedian returns with an approximate median
 // http://www.dmi.unict.it/~battiato/download/MedianLNCS.pdf
-func ApproximateMedian(A []float64) float64 {
+func ApproximateMedian(A SliceFloat64) float64 {
 	size := len(A)
 	step := 1
 	r := int(math.Round(root(float64(size), 3)))
@@ -22,7 +28,7 @@ func ApproximateMedian(A []float64) float64 {
 	return A[(size-1)/2]
 }
 
-func tripletAdjut(A []float64, i int, step int) []float64 {
+func tripletAdjut(A SliceFloat64, i int, step int) SliceFloat64 {
 	size := len(A)
 	j := i + step
 	k := i + 2
@@ -33,25 +39,22 @@ func tripletAdjut(A []float64, i int, step int) []float64 {
 
 	if A[i] < A[j] {
 		if A[k] < A[i] {
-			return swap(A, i, j)
+			A.Swap(i, j)
+			return A
 		} else if A[k] < A[j] {
-			return swap(A, j, k)
+			A.Swap(j, k)
+			return A
 		}
 	} else {
 		if A[i] < A[k] {
-			return swap(A, i, j)
+			A.Swap(i, j)
+			return A
 		} else if A[k] > A[j] {
-			return swap(A, j, k)
+			A.Swap(j, k)
+			return A
 		}
 	}
 
-	return A
-}
-
-func swap(A []float64, i int, j int) []float64 {
-	tmp := A[i]
-	A[j] = A[i]
-	A[i] = tmp
 	return A
 }
 
@@ -76,7 +79,7 @@ func root(a float64, n int) float64 {
 }
 
 // Avg calculates the average
-func Avg(xs []float64) float64 {
+func Avg(xs SliceFloat64) float64 {
 	total := 0.0
 	for _, v := range xs {
 		total += v

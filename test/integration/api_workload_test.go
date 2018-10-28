@@ -30,35 +30,8 @@ func TestApiGetWorkloads(t *testing.T) {
 		panic(jsonErr)
 	}
 
-	assert.Equal(t, res.StatusCode, http.StatusOK)
-	assert.ElementsMatch(t, workloadsResponse.Workloads, getWorkloadsResponseMock())
-}
-
-func TestApiGetWorkloadStatus(t *testing.T) {
-	mockServer := fixtures.PrometheusResponseStub(t, "../data/prom_workload_source_request_duration_95th_10m_1m.json")
-	defer mockServer.Close()
-
-	workloadName := "productpage-v1"
-
-	// router
-	testRouter := router.Setup(mockServer.URL)
-	server := httptest.NewServer(testRouter)
-
-	// call api
-	workloadsURL := server.URL + "/api/v1/workloads/" + workloadName + "/status"
-	res, body := fixtures.HTTPRequest(t, workloadsURL)
-
-	workloadsResponse := models.Workload{}
-	jsonErr := json.Unmarshal(body, &workloadsResponse)
-	if jsonErr != nil {
-		panic(jsonErr)
-	}
-
-	expected := models.Workload{}
-	expected.Name = workloadName
-
-	assert.Equal(t, res.StatusCode, http.StatusOK)
-	assert.Equal(t, workloadsResponse, expected)
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+	assert.ElementsMatch(t, getWorkloadsResponseMock(), workloadsResponse.Workloads)
 }
 
 func getWorkloadsResponseMock() []models.Workload {

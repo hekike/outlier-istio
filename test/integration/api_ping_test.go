@@ -11,17 +11,14 @@ import (
 )
 
 func TestApiGetPing(t *testing.T) {
-	mockServer := fixtures.PrometheusResponseStub(t, "prom_workloads.json")
-	defer mockServer.Close()
-
 	// router
-	testRouter := router.Setup(mockServer.URL)
+	testRouter := router.Setup("http://localhost")
 	server := httptest.NewServer(testRouter)
 
 	// test ping
-	workloadsURL := server.URL + "/ping"
-	res, _ := fixtures.HTTPRequest(t, workloadsURL)
+	testURL := server.URL + "/ping"
+	res, _ := fixtures.HTTPRequest(t, testURL)
 
-	assert.Equal(t, res.StatusCode, http.StatusOK)
+	assert.Equal(t, http.StatusOK, res.StatusCode)
 
 }

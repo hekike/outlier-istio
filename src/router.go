@@ -103,7 +103,7 @@ func Setup(promAddr string) *gin.Engine {
 		name := c.Param("name")
 		end := time.Now()
 		start := end.Add(-time.Hour)
-		historical := 60 * time.Minute
+		historical := 15 * time.Minute
 		statusStep := 5 * time.Minute
 
 		workload, err := models.GetWorkloadStatusByName(
