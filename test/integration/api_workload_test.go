@@ -13,7 +13,8 @@ import (
 )
 
 func TestApiGetWorkloads(t *testing.T) {
-	mockServer := fixtures.PrometheusResponseStub(t, "../data/prom_workloads.json")
+	files := []string{"../data/prom_workloads.json"}
+	mockServer := fixtures.PrometheusResponseStub(t, files)
 	defer mockServer.Close()
 
 	// router

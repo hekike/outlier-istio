@@ -17,6 +17,7 @@
 package router
 
 import (
+	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -68,27 +69,46 @@ func Setup(promAddr string) *gin.Engine {
 	//		type: string
 	//		description: TODO
 	apiRouter.GET("/workloads", func(c *gin.Context) {
+		// Get data
 		workloadsMap, err := models.GetWorkloads(promAddr)
 		if err != nil {
 			c.AbortWithError(500, err)
 			return
 		}
 
-		// Convert slice to array
+		// Build response
+		// Convert map to slices
 		workloads := make([]models.Workload, 0, len(workloadsMap))
 		for _, workload := range workloadsMap {
 			workloads = append(workloads, workload)
 		}
 
 		response := APIResponseWorkloads{Workloads: workloads}
-
 		c.JSON(200, response)
 	})
 
-	// swagger:route GET /api/v1/workloads workload getWorkloads
+	// swagger:route GET /api/v1/workloads/{name}/status workload getWorkloadStatusByName
 	// ---
 	// summary: Returns with destination workloads
 	// description: Returns with an array of services.
+	// parameters:
+	// 	- name: name
+	// 	  in: path
+	// 	  schema:
+	// 	    type: string
+	//	  description: Name of the workload
+	// 	- name: start
+	// 	  in: query
+	// 	  schema:
+	// 	    type: string
+	// 	    format: date
+	// 	  description: The start date for the report.
+	// 	- name: end
+	// 	  in: query
+	// 	  schema:
+	// 	    type: string
+	// 	    format: date
+	// 	  description: The end date for the report.
 	// produces:
 	// 	- application/json
 	// schemes:
@@ -107,6 +127,13 @@ func Setup(promAddr string) *gin.Engine {
 	apiRouter.GET("/workloads/:name/status", func(c *gin.Context) {
 		name := c.Param("name")
 
+		// Validation
+		if name == "" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "Workload name cannot be empty",
+			})
+		}
+
 		// Bind query string parameters
 		var status Status
 		err := c.ShouldBindQuery(&status)
@@ -115,16 +142,17 @@ func Setup(promAddr string) *gin.Engine {
 			return
 		}
 
+		// Parameter defaults
 		if status.End.IsZero() {
 			status.End = time.Now()
 		}
 		if status.Start.IsZero() {
 			status.Start = status.End.Add(-time.Hour)
 		}
-
 		historical := 15 * time.Minute
 		statusStep := 5 * time.Minute
 
+		// Get data
 		workload, err := models.GetWorkloadStatusByName(
 			promAddr,
 			name,
@@ -138,6 +166,7 @@ func Setup(promAddr string) *gin.Engine {
 			return
 		}
 
+		// Response
 		c.JSON(200, workload)
 	})
 

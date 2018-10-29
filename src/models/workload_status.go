@@ -14,14 +14,14 @@ import (
 	promModel "github.com/prometheus/common/model"
 )
 
-const destinationWorkloadRequestDurationPercentiles = `
+const workloadRequestDurationPercentiles = `
 	histogram_quantile(
 		0.95,
 		sum(
 			rate(
 				istio_request_duration_seconds_bucket {
 					reporter = "destination",
-					source_workload = "%s",
+					%s_workload = "%s",
 					destination_app != "mixer",
 					destination_app != "telemetry",
 					destination_app != "policy"
@@ -168,69 +168,121 @@ func GetWorkloadStatusByName(
 	statusStep time.Duration,
 ) (*Workload, error) {
 	historicalStart := start.Add(-historical)
+	workload := Workload{}
+	workload.Name = name
 
-	// Fetch data
-	query := fmt.Sprintf(
-		destinationWorkloadRequestDurationPercentiles,
+	// Fetch data by source
+	queryBySource := fmt.Sprintf(
+		workloadRequestDurationPercentiles,
+		"source",
 		"productpage-v1",
 		"60s",
 	)
-
-	matrix, err := fetchQueryRange(addr, historicalStart, end, query)
+	matrixBySource, err := fetchQueryRange(
+		addr,
+		historicalStart,
+		end,
+		queryBySource,
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	// Process data
-	workload := Workload{}
-	workload.Name = name
-
 	// Iterate on destination workload dimension
-	for _, sampleStream := range matrix {
+	for _, sampleStream := range matrixBySource {
 		metric := sampleStream.Metric
-		values := sampleStream.Values
-		historicalSampleValues := utils.SliceFloat64{}
-
-		aggregatedStatus := AggregatedStatus{
-			Step:   statusStep,
-			Status: make(map[int64]AggregatedStatusItem),
-		}
-
-		// Sort sample pairs
-		sort.Slice(values, func(i, j int) bool {
-			return values[i].Timestamp.Time().Unix() < values[j].Timestamp.Time().Unix()
-		})
-
-		// Iterate on time dimension
-		for _, samplePair := range values {
-			t := samplePair.Timestamp.Time()
-			v := float64(samplePair.Value)
-
-			// Value in the current range
-			if t.Unix() > start.Unix() {
-				aggregatedStatus.AddStatus(t, v)
-			} else {
-				// Historical value
-				// TODO: is it valid to skip?
-				if !math.IsNaN(v) {
-					historicalSampleValues = append(
-						historicalSampleValues,
-						v,
-					)
-				}
-			}
-		}
+		statuses := getWorkloadBySampleStream(
+			sampleStream,
+			start,
+			statusStep,
+		)
 
 		destinationWorkload := Workload{
 			Name:     string(metric["destination_workload"]),
 			App:      string(metric["destination_app"]),
-			Statuses: aggregatedStatus.Aggregate(historicalSampleValues),
+			Statuses: statuses,
 		}
 
 		workload.AddDestination(destinationWorkload)
 	}
 
+	// Fetch data by destination
+	queryByDestination := fmt.Sprintf(
+		workloadRequestDurationPercentiles,
+		"destination",
+		"productpage-v1",
+		"60s",
+	)
+	matrixByDestination, err := fetchQueryRange(
+		addr,
+		historicalStart,
+		end,
+		queryByDestination,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// Iterate on source workload dimension
+	for _, sampleStream := range matrixByDestination {
+		metric := sampleStream.Metric
+		statuses := getWorkloadBySampleStream(
+			sampleStream,
+			start,
+			statusStep,
+		)
+
+		sourceWorkload := Workload{
+			Name:     string(metric["source_workload"]),
+			App:      string(metric["source_app"]),
+			Statuses: statuses,
+		}
+
+		workload.AddSource(sourceWorkload)
+	}
+
 	return &workload, nil
+}
+
+func getWorkloadBySampleStream(
+	sampleStream *promModel.SampleStream,
+	start time.Time,
+	statusStep time.Duration,
+) []AggregatedStatusItem {
+	values := sampleStream.Values
+	historicalSampleValues := utils.SliceFloat64{}
+
+	aggregatedStatus := AggregatedStatus{
+		Step:   statusStep,
+		Status: make(map[int64]AggregatedStatusItem),
+	}
+
+	// Sort sample pairs
+	sort.Slice(values, func(i, j int) bool {
+		return values[i].Timestamp.Time().Unix() < values[j].Timestamp.Time().Unix()
+	})
+
+	// Iterate on time dimension
+	for _, samplePair := range values {
+		t := samplePair.Timestamp.Time()
+		v := float64(samplePair.Value)
+
+		// Value in the current range
+		if t.Unix() > start.Unix() {
+			aggregatedStatus.AddStatus(t, v)
+		} else {
+			// Historical value
+			// TODO: is it valid to skip?
+			if !math.IsNaN(v) {
+				historicalSampleValues = append(
+					historicalSampleValues,
+					v,
+				)
+			}
+		}
+	}
+	statuses := aggregatedStatus.Aggregate(historicalSampleValues)
+	return statuses
 }
 
 func fetchQueryRange(
