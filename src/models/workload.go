@@ -27,36 +27,38 @@ const workloadQuery = `
 	)
 `
 
-// WorkloadItem struct.
-type WorkloadItem struct {
-	Name string `json:"name"` // name of the workload
-	App  string `json:"app"`  // istio app
+// WorkloadStatus struct.
+type WorkloadStatus struct {
+	Time   time.Time `json:"date"`
+	Status string    `json:"status"`
 }
 
 // Workload struct.
 type Workload struct {
-	WorkloadItem
-	Sources      []WorkloadItem `json:"sources"`
-	Destinations []WorkloadItem `json:"destinations"`
+	Name         string                 `json:"name"`          // name of the workload
+	App          string                 `json:"app,omitempty"` // istio app
+	Sources      []Workload             `json:"sources"`
+	Destinations []Workload             `json:"destinations"`
+	Statuses     []AggregatedStatusItem `json:"statuses,omitempty"`
 }
 
 // AddSource adds a source workload
-func (w *Workload) AddSource(wi WorkloadItem) []WorkloadItem {
+func (w *Workload) AddSource(wi Workload) []Workload {
 	w.Sources = append(w.Sources, wi)
 	return w.Sources
 }
 
 // AddDestination adds a destination workload
-func (w *Workload) AddDestination(wi WorkloadItem) []WorkloadItem {
+func (w *Workload) AddDestination(wi Workload) []Workload {
 	w.Destinations = append(w.Destinations, wi)
 	return w.Destinations
 }
 
 // GetWorkloads returns workload with it's destination workloads
-// TODO: refactor to use the same logic for adding source and destination
 func GetWorkloads(addr string) (map[string]Workload, error) {
 	// Fetch data
-	matrix, err := fetchWorkloads(addr)
+	query := fmt.Sprintf(workloadQuery, "60s")
+	matrix, err := fetchQuery(addr, query)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +75,7 @@ func GetWorkloads(addr string) (map[string]Workload, error) {
 		id, workload = getWorkloadByMetric(metric, "source", workloads)
 
 		// Add destination workload
-		destinationWorkload := WorkloadItem{
+		destinationWorkload := Workload{
 			Name: string(metric["destination_workload"]),
 			App:  string(metric["destination_app"]),
 		}
@@ -91,7 +93,7 @@ func GetWorkloads(addr string) (map[string]Workload, error) {
 		id, workload = getWorkloadByMetric(metric, "destination", workloads)
 
 		// Add source workload
-		sourceWorkload := WorkloadItem{
+		sourceWorkload := Workload{
 			Name: string(metric["source_workload"]),
 			App:  string(metric["source_app"]),
 		}
@@ -103,15 +105,14 @@ func GetWorkloads(addr string) (map[string]Workload, error) {
 	return workloads, nil
 }
 
-func fetchWorkloads(addr string) (promModel.Vector, error) {
+func fetchQuery(addr string, pq string) (promModel.Vector, error) {
 	client, err := promApi.NewClient(promApi.Config{Address: addr})
 	if err != nil {
 		return nil, err
 	}
 	api := promApiV1.NewAPI(client)
-	query := fmt.Sprintf(workloadQuery, "60s")
 
-	val, err := api.Query(context.Background(), query, time.Now())
+	val, err := api.Query(context.Background(), pq, time.Now())
 	if err != nil {
 		return nil, err
 	}
@@ -144,11 +145,12 @@ func getWorkloadByMetric(
 	if v, found := workloads[id]; found {
 		workload = v
 	} else {
-		workload = Workload{}
-		workload.Name = name
-		workload.App = app
-		workload.Sources = make([]WorkloadItem, 0)
-		workload.Destinations = make([]WorkloadItem, 0)
+		workload = Workload{
+			Name:         name,
+			App:          app,
+			Sources:      make([]Workload, 0),
+			Destinations: make([]Workload, 0),
+		}
 	}
 	return id, workload
 }
