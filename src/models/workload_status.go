@@ -14,6 +14,7 @@ import (
 	promModel "github.com/prometheus/common/model"
 )
 
+// workloadRequestDurationPercentiles returns a workload perentiles.
 const workloadRequestDurationPercentiles = `
 	histogram_quantile(
 		0.95,
@@ -29,11 +30,7 @@ const workloadRequestDurationPercentiles = `
 			)
 		) by (
 			le,
-			request_protocol,
-			source_workload,
-			source_app,
-			destination_workload,
-			destination_app
+			%s
 		)
 	)
 `
@@ -96,7 +93,9 @@ func (as *AggregatedStatus) AddStatus(
 }
 
 // Aggregate turns the map to an aggregated array.
-func (as *AggregatedStatus) Aggregate(hsv utils.SliceFloat64) []AggregatedStatusItem {
+func (as *AggregatedStatus) Aggregate(
+	hsv utils.SliceFloat64,
+) []AggregatedStatusItem {
 	statusItems := make([]AggregatedStatusItem, 0, len(as.Status))
 
 	// Sort statuses by time
@@ -171,77 +170,142 @@ func GetWorkloadStatusByName(
 	workload := Workload{}
 	workload.Name = name
 
+	// errors := make(chan error)
+	destinations := make(chan Workload)
+	sources := make(chan Workload)
+	workloadStatuses := make(chan []AggregatedStatusItem)
+
 	// Fetch data by source
-	queryBySource := fmt.Sprintf(
+	go func() {
+		matrixBySource, err := fetchQueryRange(
+			addr,
+			historicalStart,
+			end,
+			GetStatusQueryBySource(),
+		)
+		if err != nil {
+			panic(err)
+		}
+
+		// Iterate on destination workload dimension
+		for _, sampleStream := range matrixBySource {
+			metric := sampleStream.Metric
+			statuses := getWorkloadBySampleStream(
+				sampleStream,
+				start,
+				statusStep,
+			)
+
+			destinationWorkload := Workload{
+				Name:     string(metric["destination_workload"]),
+				App:      string(metric["destination_app"]),
+				Statuses: statuses,
+			}
+
+			destinations <- destinationWorkload
+		}
+		close(destinations)
+	}()
+
+	// Fetch data by destination
+	go func() {
+		matrixByDestination, err := fetchQueryRange(
+			addr,
+			historicalStart,
+			end,
+			GetStatusQueryByDestination(),
+		)
+		if err != nil {
+			panic(err)
+		}
+
+		// Iterate on source workload dimension
+		for _, sampleStream := range matrixByDestination {
+			metric := sampleStream.Metric
+			statuses := getWorkloadBySampleStream(
+				sampleStream,
+				start,
+				statusStep,
+			)
+
+			sourceWorkload := Workload{
+				Name:     string(metric["source_workload"]),
+				App:      string(metric["source_app"]),
+				Statuses: statuses,
+			}
+
+			sources <- sourceWorkload
+		}
+		close(sources)
+	}()
+
+	// Workload status (aggregated destination)
+	go func() {
+		matrix, err := fetchQueryRange(
+			addr,
+			historicalStart,
+			end,
+			GetStatusQuery(),
+		)
+		if err != nil {
+			panic(err)
+		}
+
+		statuses := getWorkloadBySampleStream(
+			matrix[0],
+			start,
+			statusStep,
+		)
+
+		workloadStatuses <- statuses
+
+		close(workloadStatuses)
+	}()
+
+	for w := range destinations {
+		workload.AddDestination(w)
+	}
+	for w := range sources {
+		workload.AddSource(w)
+	}
+	workload.Statuses = <-workloadStatuses
+
+	return &workload, nil
+}
+
+// GetStatusQueryBySource returns a query
+func GetStatusQueryBySource() string {
+	return fmt.Sprintf(
 		workloadRequestDurationPercentiles,
 		"source",
 		"productpage-v1",
 		"60s",
+		"request_protocol, source_workload, source_app, "+
+			"destination_workload, destination_app",
 	)
-	matrixBySource, err := fetchQueryRange(
-		addr,
-		historicalStart,
-		end,
-		queryBySource,
-	)
-	if err != nil {
-		return nil, err
-	}
+}
 
-	// Iterate on destination workload dimension
-	for _, sampleStream := range matrixBySource {
-		metric := sampleStream.Metric
-		statuses := getWorkloadBySampleStream(
-			sampleStream,
-			start,
-			statusStep,
-		)
-
-		destinationWorkload := Workload{
-			Name:     string(metric["destination_workload"]),
-			App:      string(metric["destination_app"]),
-			Statuses: statuses,
-		}
-
-		workload.AddDestination(destinationWorkload)
-	}
-
-	// Fetch data by destination
-	queryByDestination := fmt.Sprintf(
+// GetStatusQueryByDestination returns a query
+func GetStatusQueryByDestination() string {
+	return fmt.Sprintf(
 		workloadRequestDurationPercentiles,
 		"destination",
 		"productpage-v1",
 		"60s",
+		"request_protocol, source_workload, source_app, "+
+			"destination_workload, destination_app",
 	)
-	matrixByDestination, err := fetchQueryRange(
-		addr,
-		historicalStart,
-		end,
-		queryByDestination,
+}
+
+// GetStatusQuery returns a query
+func GetStatusQuery() string {
+	return fmt.Sprintf(
+		workloadRequestDurationPercentiles,
+		"source",
+		"productpage-v1",
+		"60s",
+		"request_protocol",
 	)
-	if err != nil {
-		return nil, err
-	}
-
-	// Iterate on source workload dimension
-	for _, sampleStream := range matrixByDestination {
-		metric := sampleStream.Metric
-		statuses := getWorkloadBySampleStream(
-			sampleStream,
-			start,
-			statusStep,
-		)
-
-		sourceWorkload := Workload{
-			Name:     string(metric["source_workload"]),
-			App:      string(metric["source_app"]),
-			Statuses: statuses,
-		}
-
-		workload.AddSource(sourceWorkload)
-	}
-
-	return &workload, nil
 }
 
 func getWorkloadBySampleStream(
@@ -259,7 +323,8 @@ func getWorkloadBySampleStream(
 
 	// Sort sample pairs
 	sort.Slice(values, func(i, j int) bool {
-		return values[i].Timestamp.Time().Unix() < values[j].Timestamp.Time().Unix()
+		return values[i].Timestamp.Time().Unix() <
+			values[j].Timestamp.Time().Unix()
 	})
 
 	// Iterate on time dimension

@@ -10,6 +10,7 @@ import (
 	promModel "github.com/prometheus/common/model"
 )
 
+// WorkloadQuery returns workloads
 const workloadQuery = `
 	sum(
 		rate(
@@ -57,8 +58,7 @@ func (w *Workload) AddDestination(wi Workload) []Workload {
 // GetWorkloads returns workload with it's destination workloads
 func GetWorkloads(addr string) (map[string]Workload, error) {
 	// Fetch data
-	query := fmt.Sprintf(workloadQuery, "60s")
-	matrix, err := fetchQuery(addr, query)
+	matrix, err := fetchQuery(addr, GetWorkloadQuery())
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +90,11 @@ func GetWorkloads(addr string) (map[string]Workload, error) {
 		// Get workload
 		var id string
 		var workload Workload
-		id, workload = getWorkloadByMetric(metric, "destination", workloads)
+		id, workload = getWorkloadByMetric(
+			metric,
+			"destination",
+			workloads,
+		)
 
 		// Add source workload
 		sourceWorkload := Workload{
@@ -103,6 +107,11 @@ func GetWorkloads(addr string) (map[string]Workload, error) {
 	}
 
 	return workloads, nil
+}
+
+// GetWorkloadQuery returns a workload query
+func GetWorkloadQuery() string {
+	return fmt.Sprintf(workloadQuery, "60s")
 }
 
 func fetchQuery(addr string, pq string) (promModel.Vector, error) {

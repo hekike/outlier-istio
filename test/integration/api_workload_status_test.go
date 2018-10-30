@@ -13,11 +13,14 @@ import (
 )
 
 func TestApiGetWorkloadStatus(t *testing.T) {
-	files := []string{
-		"../data/prom_workload_status_source.json",
-		"../data/prom_workload_status_destination.json",
-	}
-	mockServer := fixtures.PrometheusResponseStub(t, files)
+	mockServer := fixtures.PrometheusResponseStub(t, map[string]string{
+		models.GetStatusQueryByDestination():
+			"../data/prom_workload_status_destination.json",
+		models.GetStatusQueryBySource():
+			"../data/prom_workload_status_source.json",
+		models.GetStatusQuery():
+			"../data/prom_workload_status_destination.json",
+	})
 	defer mockServer.Close()
 
 	workloadName := "productpage-v1"
@@ -27,7 +30,8 @@ func TestApiGetWorkloadStatus(t *testing.T) {
 	server := httptest.NewServer(testRouter)
 
 	// call api
-	workloadsURL := server.URL + "/api/v1/workloads/" + workloadName + "/status?end=2018-10-27T15:00:00Z"
+	workloadsURL := server.URL + "/api/v1/workloads/" +
+		workloadName + "/status?end=2018-10-27T15:00:00Z"
 	res, body := fixtures.HTTPRequest(t, workloadsURL)
 
 	workloadsResponse := models.Workload{}
@@ -65,6 +69,20 @@ func TestApiGetWorkloadStatus(t *testing.T) {
 	assert.Equal(t, "istio-ingressgateway", ingressgateway.App)
 
 	statuses = make([]string, len(ingressgateway.Statuses))
+
+	for i, status := range ingressgateway.Statuses {
+		statuses[i] = status.Status
+	}
+
+	assert.Equal(t, []string{
+		"high", "ok", "ok", "ok",
+		"ok", "ok", "ok", "ok",
+		"ok", "ok", "ok", "ok",
+		"ok", "high", "high", "high",
+	}, statuses)
+
+	// Aggregated expectations
+	statuses = make([]string, len(workloadsResponse.Statuses))
 
 	for i, status := range ingressgateway.Statuses {
 		statuses[i] = status.Status
