@@ -167,103 +167,126 @@ func GetWorkloadStatusByName(
 	workload := Workload{}
 	workload.Name = name
 
+	// errors := make(chan error)
+	destinations := make(chan Workload)
+	sources := make(chan Workload)
+	workloadStatuses := make(chan []AggregatedStatusItem)
+
 	// Fetch data by source
-	queryBySource := fmt.Sprintf(
-		workloadRequestDurationPercentiles,
-		"source",
-		"productpage-v1",
-		"60s",
-		"request_protocol, source_workload, source_app, destination_workload, destination_app",
-	)
-	matrixBySource, err := fetchQueryRange(
-		addr,
-		historicalStart,
-		end,
-		queryBySource,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	// Iterate on destination workload dimension
-	for _, sampleStream := range matrixBySource {
-		metric := sampleStream.Metric
-		statuses := getWorkloadBySampleStream(
-			sampleStream,
-			start,
-			statusStep,
+	go func() {
+		queryBySource := fmt.Sprintf(
+			workloadRequestDurationPercentiles,
+			"source",
+			"productpage-v1",
+			"60s",
+			"request_protocol, source_workload, source_app, destination_workload, destination_app",
 		)
-
-		destinationWorkload := Workload{
-			Name:     string(metric["destination_workload"]),
-			App:      string(metric["destination_app"]),
-			Statuses: statuses,
+		matrixBySource, err := fetchQueryRange(
+			addr,
+			historicalStart,
+			end,
+			queryBySource,
+		)
+		if err != nil {
+			panic(err)
 		}
 
-		workload.AddDestination(destinationWorkload)
-	}
+		// Iterate on destination workload dimension
+		for _, sampleStream := range matrixBySource {
+			metric := sampleStream.Metric
+			statuses := getWorkloadBySampleStream(
+				sampleStream,
+				start,
+				statusStep,
+			)
+
+			destinationWorkload := Workload{
+				Name:     string(metric["destination_workload"]),
+				App:      string(metric["destination_app"]),
+				Statuses: statuses,
+			}
+
+			destinations <- destinationWorkload
+		}
+		close(destinations)
+	}()
 
 	// Fetch data by destination
-	queryByDestination := fmt.Sprintf(
-		workloadRequestDurationPercentiles,
-		"destination",
-		"productpage-v1",
-		"60s",
-		"request_protocol, source_workload, source_app, destination_workload, destination_app",
-	)
-	matrixByDestination, err := fetchQueryRange(
-		addr,
-		historicalStart,
-		end,
-		queryByDestination,
-	)
-	if err != nil {
-		return nil, err
-	}
+	go func() {
+		queryByDestination := fmt.Sprintf(
+			workloadRequestDurationPercentiles,
+			"destination",
+			"productpage-v1",
+			"60s",
+			"request_protocol, source_workload, source_app, destination_workload, destination_app",
+		)
+		matrixByDestination, err := fetchQueryRange(
+			addr,
+			historicalStart,
+			end,
+			queryByDestination,
+		)
+		if err != nil {
+			panic(err)
+		}
 
-	// Iterate on source workload dimension
-	for _, sampleStream := range matrixByDestination {
-		metric := sampleStream.Metric
+		// Iterate on source workload dimension
+		for _, sampleStream := range matrixByDestination {
+			metric := sampleStream.Metric
+			statuses := getWorkloadBySampleStream(
+				sampleStream,
+				start,
+				statusStep,
+			)
+
+			sourceWorkload := Workload{
+				Name:     string(metric["source_workload"]),
+				App:      string(metric["source_app"]),
+				Statuses: statuses,
+			}
+
+			sources <- sourceWorkload
+		}
+		close(sources)
+	}()
+
+	// Workload status (aggregated destination)
+	go func() {
+		query := fmt.Sprintf(
+			workloadRequestDurationPercentiles,
+			"source",
+			"productpage-v1",
+			"60s",
+			"request_protocol",
+		)
+		matrix, err := fetchQueryRange(
+			addr,
+			historicalStart,
+			end,
+			query,
+		)
+		if err != nil {
+			panic(err)
+		}
+
 		statuses := getWorkloadBySampleStream(
-			sampleStream,
+			matrix[0],
 			start,
 			statusStep,
 		)
 
-		sourceWorkload := Workload{
-			Name:     string(metric["source_workload"]),
-			App:      string(metric["source_app"]),
-			Statuses: statuses,
-		}
+		workloadStatuses <- statuses
 
-		workload.AddSource(sourceWorkload)
+		close(workloadStatuses)
+	}()
+
+	for w := range destinations {
+		workload.AddDestination(w)
 	}
-
-	// Workload status (aggregated destination)
-	query := fmt.Sprintf(
-		workloadRequestDurationPercentiles,
-		"source",
-		"productpage-v1",
-		"60s",
-		"request_protocol",
-	)
-	matrix, err := fetchQueryRange(
-		addr,
-		historicalStart,
-		end,
-		query,
-	)
-	if err != nil {
-		return nil, err
+	for w := range sources {
+		workload.AddSource(w)
 	}
-
-	statuses := getWorkloadBySampleStream(
-		matrix[0],
-		start,
-		statusStep,
-	)
-
-	workload.Statuses = statuses
+	workload.Statuses = <-workloadStatuses
 
 	return &workload, nil
 }

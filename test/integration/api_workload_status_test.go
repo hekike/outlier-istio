@@ -14,8 +14,9 @@ import (
 
 func TestApiGetWorkloadStatus(t *testing.T) {
 	files := []string{
-		"../data/prom_workload_status_source.json",
+		// TODO: order is arbitary because of goroutines
 		"../data/prom_workload_status_destination.json",
+		"../data/prom_workload_status_source.json",
 		"../data/prom_workload_status_destination.json",
 	}
 	mockServer := fixtures.PrometheusResponseStub(t, files)
