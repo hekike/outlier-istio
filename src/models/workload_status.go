@@ -14,6 +14,7 @@ import (
 	promModel "github.com/prometheus/common/model"
 )
 
+// workloadRequestDurationPercentiles returns a workload perentiles.
 const workloadRequestDurationPercentiles = `
 	histogram_quantile(
 		0.95,
@@ -92,7 +93,9 @@ func (as *AggregatedStatus) AddStatus(
 }
 
 // Aggregate turns the map to an aggregated array.
-func (as *AggregatedStatus) Aggregate(hsv utils.SliceFloat64) []AggregatedStatusItem {
+func (as *AggregatedStatus) Aggregate(
+	hsv utils.SliceFloat64,
+) []AggregatedStatusItem {
 	statusItems := make([]AggregatedStatusItem, 0, len(as.Status))
 
 	// Sort statuses by time
@@ -174,18 +177,11 @@ func GetWorkloadStatusByName(
 
 	// Fetch data by source
 	go func() {
-		queryBySource := fmt.Sprintf(
-			workloadRequestDurationPercentiles,
-			"source",
-			"productpage-v1",
-			"60s",
-			"request_protocol, source_workload, source_app, destination_workload, destination_app",
-		)
 		matrixBySource, err := fetchQueryRange(
 			addr,
 			historicalStart,
 			end,
-			queryBySource,
+			GetStatusQueryBySource(),
 		)
 		if err != nil {
 			panic(err)
@@ -213,18 +209,11 @@ func GetWorkloadStatusByName(
 
 	// Fetch data by destination
 	go func() {
-		queryByDestination := fmt.Sprintf(
-			workloadRequestDurationPercentiles,
-			"destination",
-			"productpage-v1",
-			"60s",
-			"request_protocol, source_workload, source_app, destination_workload, destination_app",
-		)
 		matrixByDestination, err := fetchQueryRange(
 			addr,
 			historicalStart,
 			end,
-			queryByDestination,
+			GetStatusQueryByDestination(),
 		)
 		if err != nil {
 			panic(err)
@@ -252,18 +241,11 @@ func GetWorkloadStatusByName(
 
 	// Workload status (aggregated destination)
 	go func() {
-		query := fmt.Sprintf(
-			workloadRequestDurationPercentiles,
-			"source",
-			"productpage-v1",
-			"60s",
-			"request_protocol",
-		)
 		matrix, err := fetchQueryRange(
 			addr,
 			historicalStart,
 			end,
-			query,
+			GetStatusQuery(),
 		)
 		if err != nil {
 			panic(err)
@@ -291,6 +273,41 @@ func GetWorkloadStatusByName(
 	return &workload, nil
 }
 
+// GetStatusQueryBySource returns a query
+func GetStatusQueryBySource() string {
+	return fmt.Sprintf(
+		workloadRequestDurationPercentiles,
+		"source",
+		"productpage-v1",
+		"60s",
+		"request_protocol, source_workload, source_app, "+
+			"destination_workload, destination_app",
+	)
+}
+
+// GetStatusQueryByDestination returns a query
+func GetStatusQueryByDestination() string {
+	return fmt.Sprintf(
+		workloadRequestDurationPercentiles,
+		"destination",
+		"productpage-v1",
+		"60s",
+		"request_protocol, source_workload, source_app, "+
+			"destination_workload, destination_app",
+	)
+}
+
+// GetStatusQuery returns a query
+func GetStatusQuery() string {
+	return fmt.Sprintf(
+		workloadRequestDurationPercentiles,
+		"source",
+		"productpage-v1",
+		"60s",
+		"request_protocol",
+	)
+}
+
 func getWorkloadBySampleStream(
 	sampleStream *promModel.SampleStream,
 	start time.Time,
@@ -306,7 +323,8 @@ func getWorkloadBySampleStream(
 
 	// Sort sample pairs
 	sort.Slice(values, func(i, j int) bool {
-		return values[i].Timestamp.Time().Unix() < values[j].Timestamp.Time().Unix()
+		return values[i].Timestamp.Time().Unix() <
+			values[j].Timestamp.Time().Unix()
 	})
 
 	// Iterate on time dimension

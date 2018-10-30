@@ -9,14 +9,15 @@ import (
 )
 
 // PrometheusResponseStub creates a mock server
-func PrometheusResponseStub(t *testing.T, filename []string) *httptest.Server {
-	i := 0
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json, err := ioutil.ReadFile(filename[i])
+func PrometheusResponseStub(t *testing.T, filename map[string]string) *httptest.Server {
+	server := httptest.NewServer(http.HandlerFunc(func(
+		w http.ResponseWriter,
+		r *http.Request,
+	) {
+		json, err := ioutil.ReadFile(filename[r.URL.Query().Get("query")])
 		if err != nil {
 			t.Error(err)
 		}
-		i++
 		resp := string(json)
 		w.Write([]byte(resp))
 	}))

@@ -13,8 +13,9 @@ import (
 )
 
 func TestApiGetWorkloads(t *testing.T) {
-	files := []string{"../data/prom_workloads.json"}
-	mockServer := fixtures.PrometheusResponseStub(t, files)
+	mockServer := fixtures.PrometheusResponseStub(t, map[string]string{
+		models.GetWorkloadQuery(): "../data/prom_workloads.json",
+	})
 	defer mockServer.Close()
 
 	// router
@@ -32,7 +33,11 @@ func TestApiGetWorkloads(t *testing.T) {
 	}
 
 	assert.Equal(t, http.StatusOK, res.StatusCode)
-	assert.ElementsMatch(t, getWorkloadsResponseMock(), workloadsResponse.Workloads)
+	assert.ElementsMatch(
+		t,
+		getWorkloadsResponseMock(),
+		workloadsResponse.Workloads,
+	)
 }
 
 func getWorkloadsResponseMock() []models.Workload {
@@ -54,13 +59,21 @@ func getWorkloadsResponseMock() []models.Workload {
 	ratings.App = "ratings"
 	ratings.Destinations = make([]models.Workload, 0)
 
-	unknown.AddDestination(models.Workload{Name: "productpage-v1", App: "productpage"})
+	unknown.AddDestination(
+		models.Workload{Name: "productpage-v1", App: "productpage"},
+	)
 
 	productpage.AddSource(models.Workload{Name: "unknown", App: "unknown"})
-	productpage.AddDestination(models.Workload{Name: "reviews-v3", App: "reviews"})
+	productpage.AddDestination(
+		models.Workload{Name: "reviews-v3", App: "reviews"},
+	)
 
-	reviews.AddSource(models.Workload{Name: "productpage-v1", App: "productpage"})
-	reviews.AddDestination(models.Workload{Name: "ratings-v1", App: "ratings"})
+	reviews.AddSource(
+		models.Workload{Name: "productpage-v1", App: "productpage"},
+	)
+	reviews.AddDestination(
+		models.Workload{Name: "ratings-v1", App: "ratings"},
+	)
 
 	ratings.AddSource(models.Workload{Name: "reviews-v3", App: "reviews"})
 
