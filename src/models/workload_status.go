@@ -29,11 +29,7 @@ const workloadRequestDurationPercentiles = `
 			)
 		) by (
 			le,
-			request_protocol,
-			source_workload,
-			source_app,
-			destination_workload,
-			destination_app
+			%s
 		)
 	)
 `
@@ -177,6 +173,7 @@ func GetWorkloadStatusByName(
 		"source",
 		"productpage-v1",
 		"60s",
+		"request_protocol, source_workload, source_app, destination_workload, destination_app",
 	)
 	matrixBySource, err := fetchQueryRange(
 		addr,
@@ -212,6 +209,7 @@ func GetWorkloadStatusByName(
 		"destination",
 		"productpage-v1",
 		"60s",
+		"request_protocol, source_workload, source_app, destination_workload, destination_app",
 	)
 	matrixByDestination, err := fetchQueryRange(
 		addr,
@@ -240,6 +238,32 @@ func GetWorkloadStatusByName(
 
 		workload.AddSource(sourceWorkload)
 	}
+
+	// Workload status (aggregated destination)
+	query := fmt.Sprintf(
+		workloadRequestDurationPercentiles,
+		"source",
+		"productpage-v1",
+		"60s",
+		"request_protocol",
+	)
+	matrix, err := fetchQueryRange(
+		addr,
+		historicalStart,
+		end,
+		query,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	statuses := getWorkloadBySampleStream(
+		matrix[0],
+		start,
+		statusStep,
+	)
+
+	workload.Statuses = statuses
 
 	return &workload, nil
 }

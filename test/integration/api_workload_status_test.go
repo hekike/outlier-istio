@@ -16,6 +16,7 @@ func TestApiGetWorkloadStatus(t *testing.T) {
 	files := []string{
 		"../data/prom_workload_status_source.json",
 		"../data/prom_workload_status_destination.json",
+		"../data/prom_workload_status_destination.json",
 	}
 	mockServer := fixtures.PrometheusResponseStub(t, files)
 	defer mockServer.Close()
@@ -65,6 +66,20 @@ func TestApiGetWorkloadStatus(t *testing.T) {
 	assert.Equal(t, "istio-ingressgateway", ingressgateway.App)
 
 	statuses = make([]string, len(ingressgateway.Statuses))
+
+	for i, status := range ingressgateway.Statuses {
+		statuses[i] = status.Status
+	}
+
+	assert.Equal(t, []string{
+		"high", "ok", "ok", "ok",
+		"ok", "ok", "ok", "ok",
+		"ok", "ok", "ok", "ok",
+		"ok", "high", "high", "high",
+	}, statuses)
+
+	// Aggregated expectations
+	statuses = make([]string, len(workloadsResponse.Statuses))
 
 	for i, status := range ingressgateway.Statuses {
 		statuses[i] = status.Status
