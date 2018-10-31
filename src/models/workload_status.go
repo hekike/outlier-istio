@@ -7,6 +7,7 @@ import (
 	"sort"
 	"time"
 
+	multierror "github.com/hashicorp/go-multierror"
 	"github.com/hekike/outlier-istio/src/utils"
 	"github.com/montanaflynn/stats"
 	promApi "github.com/prometheus/client_golang/api"
@@ -157,6 +158,16 @@ func (as *AggregatedStatus) Aggregate(
 	return statusItems
 }
 
+type workloadsResult struct {
+	Workloads []Workload
+	Error     error
+}
+
+type workloadStatusesResult struct {
+	StatusItems []AggregatedStatusItem
+	Error       error
+}
+
 // GetWorkloadStatusByName returns a single workload with it's status.
 func GetWorkloadStatusByName(
 	addr string,
@@ -170,13 +181,15 @@ func GetWorkloadStatusByName(
 	workload := Workload{}
 	workload.Name = name
 
-	// errors := make(chan error)
-	destinations := make(chan Workload)
-	sources := make(chan Workload)
-	workloadStatuses := make(chan []AggregatedStatusItem)
+	// Channels
+	destination := make(chan workloadsResult)
+	source := make(chan workloadsResult)
+	workloadStatuses := make(chan workloadStatusesResult)
 
 	// Fetch data by source
 	go func() {
+		result := workloadsResult{}
+
 		matrixBySource, err := fetchQueryRange(
 			addr,
 			historicalStart,
@@ -184,7 +197,9 @@ func GetWorkloadStatusByName(
 			GetStatusQueryBySource(),
 		)
 		if err != nil {
-			panic(err)
+			result.Error = err
+			destination <- result
+			return
 		}
 
 		// Iterate on destination workload dimension
@@ -202,13 +217,19 @@ func GetWorkloadStatusByName(
 				Statuses: statuses,
 			}
 
-			destinations <- destinationWorkload
+			result.Workloads = append(
+				result.Workloads,
+				destinationWorkload,
+			)
 		}
-		close(destinations)
+		destination <- result
+		close(destination)
 	}()
 
 	// Fetch data by destination
 	go func() {
+		result := workloadsResult{}
+
 		matrixByDestination, err := fetchQueryRange(
 			addr,
 			historicalStart,
@@ -216,7 +237,9 @@ func GetWorkloadStatusByName(
 			GetStatusQueryByDestination(),
 		)
 		if err != nil {
-			panic(err)
+			result.Error = err
+			source <- result
+			return
 		}
 
 		// Iterate on source workload dimension
@@ -234,13 +257,19 @@ func GetWorkloadStatusByName(
 				Statuses: statuses,
 			}
 
-			sources <- sourceWorkload
+			result.Workloads = append(
+				result.Workloads,
+				sourceWorkload,
+			)
 		}
-		close(sources)
+		source <- result
+		close(source)
 	}()
 
 	// Workload status (aggregated destination)
 	go func() {
+		result := workloadStatusesResult{}
+
 		matrix, err := fetchQueryRange(
 			addr,
 			historicalStart,
@@ -248,7 +277,9 @@ func GetWorkloadStatusByName(
 			GetStatusQuery(),
 		)
 		if err != nil {
-			panic(err)
+			result.Error = err
+			workloadStatuses <- result
+			return
 		}
 
 		statuses := getWorkloadBySampleStream(
@@ -257,20 +288,42 @@ func GetWorkloadStatusByName(
 			statusStep,
 		)
 
-		workloadStatuses <- statuses
-
-		close(workloadStatuses)
+		result.StatusItems = statuses
+		workloadStatuses <- result
 	}()
 
-	for w := range destinations {
-		workload.AddDestination(w)
-	}
-	for w := range sources {
-		workload.AddSource(w)
-	}
-	workload.Statuses = <-workloadStatuses
+	var err error
 
-	return &workload, nil
+	// Source result
+	sourceResult := <-source
+
+	if sourceResult.Error != nil {
+		err = multierror.Append(err, sourceResult.Error)
+	} else {
+		for _, w := range sourceResult.Workloads {
+			workload.AddSource(w)
+		}
+	}
+
+	// Destination result
+	destinationResult := <-destination
+	if destinationResult.Error != nil {
+		err = multierror.Append(err, destinationResult.Error)
+	} else {
+		for _, w := range destinationResult.Workloads {
+			workload.AddDestination(w)
+		}
+	}
+
+	// Status result
+	statusResult := <-workloadStatuses
+	if statusResult.Error != nil {
+		err = multierror.Append(err, statusResult.Error)
+	} else {
+		workload.Statuses = statusResult.StatusItems
+	}
+
+	return &workload, err
 }
 
 // GetStatusQueryBySource returns a query
