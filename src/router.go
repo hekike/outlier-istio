@@ -18,6 +18,7 @@ package router
 
 import (
 	"net/http"
+	"sort"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -74,17 +75,26 @@ func Setup(promAddr string) *gin.Engine {
 		// Get data
 		workloadsMap, err := models.GetWorkloads(promAddr)
 		if err != nil {
-			c.AbortWithError(500, err)
+			c.AbortWithStatusJSON(500, gin.H{
+				"error": err,
+			})
 			return
 		}
 
-		// Build response
+		// Sort map keys
+		keys := make([]string, 0, len(workloadsMap))
+		for k := range workloadsMap {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+
 		// Convert map to slices
 		workloads := make([]models.Workload, 0, len(workloadsMap))
-		for _, workload := range workloadsMap {
-			workloads = append(workloads, workload)
+		for _, k := range keys {
+			workloads = append(workloads, workloadsMap[k])
 		}
 
+		// Response
 		response := APIResponseWorkloads{Workloads: workloads}
 		c.JSON(200, response)
 	})
