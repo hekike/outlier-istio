@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/hekike/outlier-istio/src/models"
 )
@@ -33,6 +34,7 @@ type APIResponseWorkloads struct {
 func Setup(promAddr string) *gin.Engine {
 	router := gin.Default()
 	apiRouter := router.Group("/api/v1")
+	apiRouter.Use(cors.Default())
 
 	// swagger:route GET /ping operation ping
 	// ---

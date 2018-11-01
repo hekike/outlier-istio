@@ -16,6 +16,10 @@ const workloadQuery = `
 		rate(
 			istio_requests_total {
 				reporter = "destination",
+				source_app != "telemetry",
+				destination_app != "telemetry",
+				source_app != "policy",
+				destination_app != "policy",
 				source_app != "mixer",
 				destination_app != "mixer"
 			}[%s]

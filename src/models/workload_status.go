@@ -223,7 +223,6 @@ func GetWorkloadStatusByName(
 			)
 		}
 		destination <- result
-		close(destination)
 	}()
 
 	// Fetch data by destination
@@ -263,7 +262,6 @@ func GetWorkloadStatusByName(
 			)
 		}
 		source <- result
-		close(source)
 	}()
 
 	// Workload status (aggregated destination)
