@@ -178,7 +178,11 @@ func GetWorkloadStatusByName(
 	statusStep time.Duration,
 ) (*Workload, error) {
 	historicalStart := start.Add(-historical)
-	workload := Workload{}
+	workload := Workload{
+		Statuses:     make([]AggregatedStatusItem, 0),
+		Sources:      make([]Workload, 0),
+		Destinations: make([]Workload, 0),
+	}
 	workload.Name = name
 
 	// Channels
@@ -194,7 +198,7 @@ func GetWorkloadStatusByName(
 			addr,
 			historicalStart,
 			end,
-			GetStatusQueryBySource(),
+			GetStatusQueryBySource(workload.Name),
 		)
 		if err != nil {
 			result.Error = err
@@ -233,7 +237,7 @@ func GetWorkloadStatusByName(
 			addr,
 			historicalStart,
 			end,
-			GetStatusQueryByDestination(),
+			GetStatusQueryByDestination(workload.Name),
 		)
 		if err != nil {
 			result.Error = err
@@ -272,7 +276,7 @@ func GetWorkloadStatusByName(
 			addr,
 			historicalStart,
 			end,
-			GetStatusQuery(),
+			GetStatusQuery(workload.Name),
 		)
 		if err != nil {
 			result.Error = err
@@ -280,13 +284,18 @@ func GetWorkloadStatusByName(
 			return
 		}
 
-		statuses := getWorkloadBySampleStream(
-			matrix[0],
-			start,
-			statusStep,
-		)
+		fmt.Println(workload.Name)
 
-		result.StatusItems = statuses
+		if len(matrix) > 0 {
+			statuses := getWorkloadBySampleStream(
+				matrix[0],
+				start,
+				statusStep,
+			)
+			result.StatusItems = statuses
+		} else {
+			result.StatusItems = make([]AggregatedStatusItem, 0)
+		}
 		workloadStatuses <- result
 	}()
 
@@ -325,11 +334,11 @@ func GetWorkloadStatusByName(
 }
 
 // GetStatusQueryBySource returns a query
-func GetStatusQueryBySource() string {
+func GetStatusQueryBySource(name string) string {
 	return fmt.Sprintf(
 		workloadRequestDurationPercentiles,
 		"source",
-		"productpage-v1",
+		name,
 		"60s",
 		"request_protocol, source_workload, source_app, "+
 			"destination_workload, destination_app",
@@ -337,11 +346,11 @@ func GetStatusQueryBySource() string {
 }
 
 // GetStatusQueryByDestination returns a query
-func GetStatusQueryByDestination() string {
+func GetStatusQueryByDestination(name string) string {
 	return fmt.Sprintf(
 		workloadRequestDurationPercentiles,
 		"destination",
-		"productpage-v1",
+		name,
 		"60s",
 		"request_protocol, source_workload, source_app, "+
 			"destination_workload, destination_app",
@@ -349,11 +358,11 @@ func GetStatusQueryByDestination() string {
 }
 
 // GetStatusQuery returns a query
-func GetStatusQuery() string {
+func GetStatusQuery(name string) string {
 	return fmt.Sprintf(
 		workloadRequestDurationPercentiles,
-		"source",
-		"productpage-v1",
+		"destination",
+		name,
 		"60s",
 		"request_protocol",
 	)

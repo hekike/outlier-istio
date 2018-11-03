@@ -16,6 +16,7 @@ const workloadQuery = `
 		rate(
 			istio_requests_total {
 				reporter = "destination",
+				source_app != "istio-ingressgateway",
 				source_app != "telemetry",
 				destination_app != "telemetry",
 				source_app != "policy",
@@ -44,7 +45,7 @@ type Workload struct {
 	App          string                 `json:"app,omitempty"` // istio app
 	Sources      []Workload             `json:"sources"`
 	Destinations []Workload             `json:"destinations"`
-	Statuses     []AggregatedStatusItem `json:"statuses,omitempty"`
+	Statuses     []AggregatedStatusItem `json:"statuses"`
 }
 
 // AddSource adds a source workload

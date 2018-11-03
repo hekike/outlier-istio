@@ -13,17 +13,14 @@ import (
 )
 
 func TestApiGetWorkloadStatus(t *testing.T) {
+	workloadName := "productpage-v1"
+
 	mockServer := fixtures.PrometheusResponseStub(t, map[string]string{
-		models.GetStatusQueryByDestination():
-			"../data/prom_workload_status_destination.json",
-		models.GetStatusQueryBySource():
-			"../data/prom_workload_status_source.json",
-		models.GetStatusQuery():
-			"../data/prom_workload_status_destination.json",
+		models.GetStatusQueryByDestination(workloadName): "../data/prom_workload_status_destination.json",
+		models.GetStatusQueryBySource(workloadName):      "../data/prom_workload_status_source.json",
+		models.GetStatusQuery(workloadName):              "../data/prom_workload_status_destination.json",
 	})
 	defer mockServer.Close()
-
-	workloadName := "productpage-v1"
 
 	// router
 	testRouter := router.Setup(mockServer.URL)
