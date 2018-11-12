@@ -12,7 +12,7 @@ spec:
     spec:
       containers:
       - name: outlier-istio
-        image: hekike/outlier-istio:v1.0.0
+        image: hekike/outlier-istio:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
