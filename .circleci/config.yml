@@ -17,6 +17,7 @@ jobs:
           docker build -t hekike/outlier-istio:latest .
           docker tag hekike/outlier-istio:latest hekike/outlier-istio:${CIRCLE_TAG}
           docker push hekike/outlier-istio:${CIRCLE_TAG}
+          docker push hekike/outlier-istio:latest
 
 workflows:
   version: 2
