@@ -31,6 +31,13 @@ kubectl -n istio-system port-forward deployment/outlier-istio 8080
 open http://localhost:8080
 ```
 
+### Config
+
+**Environment variables**
+
+- `PROMETHEUS_HOST`, optional, default: http://prometheus.istio-system.svc.cluster.local:9090
+- `PORT`, optional, default: 8080
+
 ## API
 
 Inlined OpenAPI (Swagger).
