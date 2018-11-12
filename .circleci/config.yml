@@ -8,3 +8,30 @@ jobs:
       - run: go get -u
       - run: go test -v ./test/integration/...
 
+  deploy:
+    docker:
+      - image: golang:1.11
+    steps:
+      - checkout
+      - run: |
+          docker login -u $DOCKER_USER -p $DOCKER_PASS
+          docker build -t hekike/outlier-istio:latest
+          docker tag hekike/outlier-istio:latest hekike/outlier-istio:${CIRCLE_TAG}
+          docker push hekike/outlier-istio:${CIRCLE_TAG}
+
+workflows:
+  version: 2
+  build-n-deploy:
+    jobs:
+      - build:
+          filters:  # required since `deploy` has tag filters AND requires `build`
+            tags:
+              only: /.*/
+      - deploy:
+          requires:
+            - build
+          filters:
+            tags:
+              only: /^v.*/
+            branches:
+              ignore: /.*/
