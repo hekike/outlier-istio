@@ -3,6 +3,7 @@
 [![CircleCI](https://circleci.com/gh/hekike/outlier-istio.svg?style=svg&circle-token=5504d6f60f8b1217aadf87342112f6d29ccaac2a)](https://circleci.com/gh/hekike/outlier-istio)
 
 Root cause analysis tool for Kubernetes Istio.
+
 Outlier detection with approximate median latency for Istio workloads.
 
 ![outlier-istio workloads](https://user-images.githubusercontent.com/1764512/48328025-e1559d00-e5f6-11e8-8129-15ff9c003554.png)
@@ -15,7 +16,7 @@ Outlier detection with approximate median latency for Istio workloads.
 
 ## Install
 
-*Requirements*:
+**Requirements**
 
 - Istio (with Prometheus)
 
@@ -23,10 +24,11 @@ Outlier detection with approximate median latency for Istio workloads.
 kubectl create -f ./install/deployment.yaml
 ```
 
-*Test*
+**Test**
 
 ```sh
 kubectl -n istio-system port-forward deployment/outlier-istio 8080
+open http://localhost:8080
 ```
 
 ## API
