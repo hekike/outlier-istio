@@ -10,7 +10,7 @@ jobs:
 
   deploy:
     docker:
-      - image: golang:1.11
+      - image: circleci/golang:1.11
     steps:
       - checkout
       - run: |
