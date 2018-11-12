@@ -25,3 +25,5 @@ _testmain.go
 
 gin-bin
 swagger.json
+
+web-dist

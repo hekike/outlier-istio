@@ -19,7 +19,7 @@ func TestApiGetWorkloads(t *testing.T) {
 	defer mockServer.Close()
 
 	// router
-	testRouter := router.Setup(mockServer.URL)
+	testRouter := router.Setup(mockServer.URL, "./web-dist")
 	server := httptest.NewServer(testRouter)
 
 	// call api

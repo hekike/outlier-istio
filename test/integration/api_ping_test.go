@@ -12,7 +12,7 @@ import (
 
 func TestApiGetPing(t *testing.T) {
 	// router
-	testRouter := router.Setup("http://localhost")
+	testRouter := router.Setup("http://localhost", "./web-dist")
 	server := httptest.NewServer(testRouter)
 
 	// test ping

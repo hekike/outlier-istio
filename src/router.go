@@ -21,7 +21,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/static"
 	"github.com/gin-gonic/gin"
 	"github.com/hekike/outlier-istio/src/models"
 )
@@ -32,10 +32,11 @@ type APIResponseWorkloads struct {
 }
 
 // Setup router
-func Setup(promAddr string) *gin.Engine {
+func Setup(promAddr string, webDistPath string) *gin.Engine {
 	router := gin.Default()
 	apiRouter := router.Group("/api/v1")
-	apiRouter.Use(cors.Default())
+
+	router.Use(static.Serve("/", static.LocalFile(webDistPath, false)))
 
 	// swagger:route GET /ping operation ping
 	// ---
@@ -54,7 +55,7 @@ func Setup(promAddr string) *gin.Engine {
 	//		type: string
 	//		description: OK
 	router.GET("/ping", func(c *gin.Context) {
-		c.String(200, "ok")
+		c.String(http.StatusOK, "ok")
 	})
 
 	// swagger:route GET /api/v1/workloads workload getWorkloads
@@ -75,7 +76,7 @@ func Setup(promAddr string) *gin.Engine {
 		// Get data
 		workloadsMap, err := models.GetWorkloads(promAddr)
 		if err != nil {
-			c.AbortWithStatusJSON(500, gin.H{
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
 				"error": err,
 			})
 			return
@@ -96,7 +97,7 @@ func Setup(promAddr string) *gin.Engine {
 
 		// Response
 		response := APIResponseWorkloads{Workloads: workloads}
-		c.JSON(200, response)
+		c.JSON(http.StatusOK, response)
 	})
 
 	// swagger:route GET /api/v1/workloads/{name}/status workload getWorkloadStatusByName
@@ -150,7 +151,7 @@ func Setup(promAddr string) *gin.Engine {
 		var status Status
 		err := c.ShouldBindQuery(&status)
 		if err != nil {
-			c.AbortWithError(500, err)
+			c.AbortWithError(http.StatusInternalServerError, err)
 			return
 		}
 
@@ -174,12 +175,16 @@ func Setup(promAddr string) *gin.Engine {
 			statusStep,
 		)
 		if err != nil {
-			c.AbortWithError(500, err)
+			c.AbortWithError(http.StatusInternalServerError, err)
 			return
 		}
 
 		// Response
-		c.JSON(200, workload)
+		c.JSON(http.StatusOK, workload)
+	})
+
+	router.Use(func(c *gin.Context) {
+		c.Redirect(http.StatusMovedPermanently, "/")
 	})
 
 	return router
