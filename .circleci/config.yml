@@ -14,7 +14,7 @@ jobs:
       - checkout
       - run: |
           docker login -u $DOCKER_USER -p $DOCKER_PASS
-          docker build -t hekike/outlier-istio:latest
+          docker build -t hekike/outlier-istio:latest .
           docker tag hekike/outlier-istio:latest hekike/outlier-istio:${CIRCLE_TAG}
           docker push hekike/outlier-istio:${CIRCLE_TAG}
 
