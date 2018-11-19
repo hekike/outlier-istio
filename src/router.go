@@ -122,6 +122,16 @@ func Setup(promAddr string, webDistPath string) *gin.Engine {
 	// 	    type: string
 	// 	    format: date
 	// 	  description: The end date for the report.
+	// 	- name: historical
+	// 	  in: query
+	// 	  schema:
+	// 	    type: int
+	// 	  description: Historical data in minutes
+	// 	- name: statusStep
+	// 	  in: query
+	// 	  schema:
+	// 	    type: int
+	// 	  description: Status steps in minutes
 	// produces:
 	// 	- application/json
 	// schemes:
@@ -133,8 +143,10 @@ func Setup(promAddr string, webDistPath string) *gin.Engine {
 	//		type: string
 	//		description: TODO
 	type Status struct {
-		Start time.Time `form:"start" time_format:"2006-01-02T15:04:05Z07:00"`
-		End   time.Time `form:"end" time_format:"2006-01-02T15:04:05Z07:00"`
+		Start      time.Time `form:"start" time_format:"2006-01-02T15:04:05Z07:00"`
+		End        time.Time `form:"end" time_format:"2006-01-02T15:04:05Z07:00"`
+		Historical int       `form:"historical"`
+		StatusStep int       `form:"statusStep"`
 	}
 
 	apiRouter.GET("/workloads/:name/status", func(c *gin.Context) {
@@ -162,8 +174,15 @@ func Setup(promAddr string, webDistPath string) *gin.Engine {
 		if status.Start.IsZero() {
 			status.Start = status.End.Add(-time.Hour)
 		}
-		historical := 15 * time.Minute
-		statusStep := 5 * time.Minute
+		if status.Historical == 0 {
+			status.Historical = 15
+		}
+		if status.StatusStep == 0 {
+			status.StatusStep = 5
+		}
+
+		historical := time.Duration(status.Historical) * time.Minute
+		statusStep := time.Duration(status.StatusStep) * time.Minute
 
 		// Get data
 		workload, err := models.GetWorkloadStatusByName(
