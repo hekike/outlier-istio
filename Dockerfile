@@ -1,7 +1,7 @@
 FROM golang:1.11
 
 ENV PROMETHEUS_HOST "http://prometheus.istio-system.svc.cluster.local:9090"
-ENV WEB_DIST_VERSION "v1.0.0-alpha.9"
+ENV WEB_DIST_VERSION "v1.0.0-alpha.13"
 ENV WEB_DIST_PATH "/go/src/app/web-dist"
 ENV GIN_MODE "release"
 
