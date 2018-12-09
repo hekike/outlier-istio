@@ -8,7 +8,7 @@ import (
 	"time"
 
 	multierror "github.com/hashicorp/go-multierror"
-	"github.com/hekike/outlier-istio/src/utils"
+	"github.com/hekike/outlier-istio/pkg/utils"
 	"github.com/montanaflynn/stats"
 	promApi "github.com/prometheus/client_golang/api"
 	promApiV1 "github.com/prometheus/client_golang/api/prometheus/v1"
@@ -38,6 +38,9 @@ const workloadRequestDurationPercentiles = `
 
 // 0.1 millisecond accuracy (results are in second)
 const decimals = 10000
+
+// 0.5 milliseconds
+const highTolerance = 0.5
 
 // data resolution in Prometheus (Istio default is 5s)
 const resolutionStep = 5 * time.Second
@@ -147,10 +150,10 @@ func (as *AggregatedStatus) Aggregate(
 			statusItem.Median = &medianFormatted
 		}
 
-		if medianFormatted > amFormatted {
-			statusItem.Status = "high"
-		} else {
+		if (medianFormatted - highTolerance) <= amFormatted {
 			statusItem.Status = "ok"
+		} else {
+			statusItem.Status = "high"
 		}
 
 		statusItems = append(statusItems, statusItem)

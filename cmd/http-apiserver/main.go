@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/hekike/outlier-istio/src"
+	"github.com/hekike/outlier-istio/pkg/router"
 )
 
 func main() {

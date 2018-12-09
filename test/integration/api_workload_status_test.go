@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/hekike/outlier-istio/src"
-	"github.com/hekike/outlier-istio/src/models"
+	"github.com/hekike/outlier-istio/pkg/models"
+	"github.com/hekike/outlier-istio/pkg/router"
 	"github.com/hekike/outlier-istio/test/fixtures"
 	"github.com/stretchr/testify/assert"
 )
@@ -54,10 +54,10 @@ func TestApiGetWorkloadStatus(t *testing.T) {
 	}
 
 	assert.Equal(t, []string{
-		"high", "ok", "ok", "ok",
-		"ok", "high", "ok", "high",
-		"ok", "high", "ok", "ok",
-		"high", "high", "high", "ok",
+		"ok", "ok", "ok", "ok",
+		"ok", "ok", "ok", "ok",
+		"ok", "ok", "ok", "ok",
+		"ok", "ok", "ok", "ok",
 	}, statuses)
 
 	// Source expectations
@@ -72,10 +72,10 @@ func TestApiGetWorkloadStatus(t *testing.T) {
 	}
 
 	assert.Equal(t, []string{
-		"high", "ok", "ok", "ok",
 		"ok", "ok", "ok", "ok",
 		"ok", "ok", "ok", "ok",
-		"ok", "high", "high", "high",
+		"ok", "ok", "ok", "ok",
+		"ok", "high", "ok", "ok",
 	}, statuses)
 
 	// Aggregated expectations
@@ -86,9 +86,9 @@ func TestApiGetWorkloadStatus(t *testing.T) {
 	}
 
 	assert.Equal(t, []string{
-		"high", "ok", "ok", "ok",
 		"ok", "ok", "ok", "ok",
 		"ok", "ok", "ok", "ok",
-		"ok", "high", "high", "high",
+		"ok", "ok", "ok", "ok",
+		"ok", "high", "ok", "ok",
 	}, statuses)
 }

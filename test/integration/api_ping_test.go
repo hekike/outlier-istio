@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/hekike/outlier-istio/src"
+	"github.com/hekike/outlier-istio/pkg/router"
 	"github.com/hekike/outlier-istio/test/fixtures"
 	"github.com/stretchr/testify/assert"
 )

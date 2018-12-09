@@ -23,7 +23,7 @@ import (
 
 	"github.com/gin-contrib/static"
 	"github.com/gin-gonic/gin"
-	"github.com/hekike/outlier-istio/src/models"
+	"github.com/hekike/outlier-istio/pkg/models"
 )
 
 // APIResponseWorkloads struct.

@@ -21,7 +21,7 @@ Outlier detection with approximate median latency for Istio workloads.
 - Istio (with Prometheus)
 
 ```sh
-kubectl create -f ./install/deployment.yaml
+kubectl create -f ./examples/istio/deployment.yaml
 ```
 
 **Test**
