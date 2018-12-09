@@ -1,4 +1,4 @@
-package integration
+package router
 
 import (
 	"encoding/json"
@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/hekike/outlier-istio/pkg/models"
-	"github.com/hekike/outlier-istio/pkg/router"
 	"github.com/hekike/outlier-istio/test/fixtures"
 	"github.com/stretchr/testify/assert"
 )
@@ -16,14 +15,14 @@ func TestApiGetWorkloadStatus(t *testing.T) {
 	workloadName := "productpage-v1"
 
 	mockServer := fixtures.PrometheusResponseStub(t, map[string]string{
-		models.GetStatusQueryByDestination(workloadName): "../data/prom_workload_status_destination.json",
-		models.GetStatusQueryBySource(workloadName):      "../data/prom_workload_status_source.json",
-		models.GetStatusQuery(workloadName):              "../data/prom_workload_status_destination.json",
+		models.GetStatusQueryByDestination(workloadName): "./mock/prom_workload_status_destination.json",
+		models.GetStatusQueryBySource(workloadName):      "./mock/prom_workload_status_source.json",
+		models.GetStatusQuery(workloadName):              "./mock/prom_workload_status_destination.json",
 	})
 	defer mockServer.Close()
 
 	// router
-	testRouter := router.Setup(mockServer.URL, "./web-dist")
+	testRouter := Setup(mockServer.URL, "./web-dist")
 	server := httptest.NewServer(testRouter)
 
 	// call api

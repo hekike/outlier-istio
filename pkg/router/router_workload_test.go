@@ -1,4 +1,4 @@
-package integration
+package router
 
 import (
 	"encoding/json"
@@ -6,7 +6,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/hekike/outlier-istio/pkg/router"
 	"github.com/hekike/outlier-istio/pkg/models"
 	"github.com/hekike/outlier-istio/test/fixtures"
 	"github.com/stretchr/testify/assert"
@@ -14,19 +13,19 @@ import (
 
 func TestApiGetWorkloads(t *testing.T) {
 	mockServer := fixtures.PrometheusResponseStub(t, map[string]string{
-		models.GetWorkloadQuery(): "../data/prom_workloads.json",
+		models.GetWorkloadQuery(): "./mock/prom_workloads.json",
 	})
 	defer mockServer.Close()
 
 	// router
-	testRouter := router.Setup(mockServer.URL, "./web-dist")
+	testRouter := Setup(mockServer.URL, "./web-dist")
 	server := httptest.NewServer(testRouter)
 
 	// call api
 	workloadsURL := server.URL + "/api/v1/workloads"
 	res, body := fixtures.HTTPRequest(t, workloadsURL)
 
-	workloadsResponse := router.APIResponseWorkloads{}
+	workloadsResponse := APIResponseWorkloads{}
 	jsonErr := json.Unmarshal(body, &workloadsResponse)
 	if jsonErr != nil {
 		panic(jsonErr)
