@@ -115,7 +115,7 @@ func getDownstreams(
 	// Iterate on destination workload dimension
 	for _, sampleStream := range matrix {
 		metric := sampleStream.Metric
-		statuses := getWorkloadBySampleStream(
+		statuses := getStatusesBySampleStream(
 			sampleStream,
 			start,
 			statusStep,
@@ -159,7 +159,7 @@ func getUpstreams(
 	// Iterate on source workload dimension
 	for _, sampleStream := range matrixByDestination {
 		metric := sampleStream.Metric
-		statuses := getWorkloadBySampleStream(
+		statuses := getStatusesBySampleStream(
 			sampleStream,
 			start,
 			statusStep,
@@ -199,7 +199,7 @@ func getStatuses(
 	}
 
 	if len(matrix) > 0 {
-		statuses := getWorkloadBySampleStream(
+		statuses := getStatusesBySampleStream(
 			matrix[0],
 			start,
 			statusStep,
@@ -209,7 +209,8 @@ func getStatuses(
 	return make([]AggregatedStatusItem, 0), nil
 }
 
-func getWorkloadBySampleStream(
+// Calculates statuses based on samples
+func getStatusesBySampleStream(
 	sampleStream *promModel.SampleStream,
 	start time.Time,
 	statusStep time.Duration,
