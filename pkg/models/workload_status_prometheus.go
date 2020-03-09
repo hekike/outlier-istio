@@ -1,9 +1,9 @@
 package models
 
 import (
-	"fmt"
 	"math"
 	"sort"
+	"sync"
 	"time"
 
 	multierror "github.com/hashicorp/go-multierror"
@@ -11,16 +11,6 @@ import (
 	"github.com/hekike/outlier-istio/pkg/statistics"
 	promModel "github.com/prometheus/common/model"
 )
-
-type workloadsResult struct {
-	Workloads []Workload
-	Error     error
-}
-
-type workloadStatusesResult struct {
-	StatusItems []AggregatedStatusItem
-	Error       error
-}
 
 // GetWorkloadStatusByName returns a single workload with it's status.
 func GetWorkloadStatusByName(
@@ -33,212 +23,190 @@ func GetWorkloadStatusByName(
 ) (*Workload, error) {
 	historicalStart := start.Add(-historical)
 	workload := Workload{
+		Name:         name,
 		Statuses:     make([]AggregatedStatusItem, 0),
 		Sources:      make([]Workload, 0),
 		Destinations: make([]Workload, 0),
 	}
-	workload.Name = name
 
-	// Fetch data by source
-	destination := getStatusBySource(
-		addr,
-		historicalStart,
-		end,
-		statusStep,
-		workload.Name,
-	)
+	var wg sync.WaitGroup
+	var combinedErr error
 
-	// Fetch data by destination
-	source := getStatusByDestination(
-		addr,
-		historicalStart,
-		end,
-		statusStep,
-		workload.Name,
-	)
-
-	// Workload status (aggregated destination)
-	workloadStatuses := getStatus(
-		addr,
-		historicalStart,
-		end,
-		statusStep,
-		workload.Name)
-
-	var err error
-
-	// Source result
-	sourceResult := <-source
-
-	if sourceResult.Error != nil {
-		err = multierror.Append(err, sourceResult.Error)
-	} else {
-		for _, w := range sourceResult.Workloads {
-			workload.AddSource(w)
+	// Add destinations
+	wg.Add((1))
+	go func() {
+		defer wg.Done()
+		workloads, err := getDownstreams(
+			addr,
+			historicalStart,
+			end,
+			statusStep,
+			workload.Name,
+		)
+		if err != nil {
+			combinedErr = multierror.Append(combinedErr, err)
 		}
-	}
-
-	// Destination result
-	destinationResult := <-destination
-	if destinationResult.Error != nil {
-		err = multierror.Append(err, destinationResult.Error)
-	} else {
-		for _, w := range destinationResult.Workloads {
+		for _, w := range workloads {
 			workload.AddDestination(w)
 		}
+	}()
+
+	// Add sources
+	wg.Add((1))
+	go func() {
+		defer wg.Done()
+		workloads, err := getUpstreams(
+			addr,
+			historicalStart,
+			end,
+			statusStep,
+			workload.Name,
+		)
+		if err != nil {
+			combinedErr = multierror.Append(combinedErr, err)
+		}
+		for _, w := range workloads {
+			workload.AddSource(w)
+		}
+	}()
+
+	// Add aggregated statuses
+	wg.Add((1))
+	go func() {
+		defer wg.Done()
+		statuses, err := getStatuses(
+			addr,
+			historicalStart,
+			end,
+			statusStep,
+			workload.Name,
+		)
+		if err != nil {
+			combinedErr = multierror.Append(combinedErr, err)
+		}
+		workload.Statuses = statuses
+	}()
+
+	wg.Wait()
+
+	return &workload, combinedErr
+}
+
+// Get downstream workloads with statuses
+func getDownstreams(
+	addr string,
+	start time.Time,
+	end time.Time,
+	statusStep time.Duration,
+	workload string,
+) ([]Workload, error) {
+	workloads := []Workload{}
+
+	matrix, err := prometheus.GetDownstreamRequestDurations(
+		addr,
+		start,
+		end,
+		workload,
+	)
+	if err != nil {
+		return workloads, err
 	}
 
-	// Status result
-	statusResult := <-workloadStatuses
-	if statusResult.Error != nil {
-		err = multierror.Append(err, statusResult.Error)
-	} else {
-		workload.Statuses = statusResult.StatusItems
+	// Iterate on destination workload dimension
+	for _, sampleStream := range matrix {
+		metric := sampleStream.Metric
+		statuses := getWorkloadBySampleStream(
+			sampleStream,
+			start,
+			statusStep,
+		)
+
+		workload := Workload{
+			Name:     string(metric["destination_workload"]),
+			App:      string(metric["destination_app"]),
+			Statuses: statuses,
+		}
+
+		workloads = append(
+			workloads,
+			workload,
+		)
 	}
 
-	return &workload, err
+	return workloads, nil
 }
 
-// Get status by source
-func getStatusBySource(
+// Get upstream workloads with statuses
+func getUpstreams(
 	addr string,
 	start time.Time,
 	end time.Time,
 	statusStep time.Duration,
 	workload string,
-) chan workloadsResult {
-	results := make(chan workloadsResult)
-	result := workloadsResult{}
+) ([]Workload, error) {
+	workloads := []Workload{}
 
-	go func() {
-		matrix, err := prometheus.GetStatusBySource(
-			addr,
+	matrixByDestination, err := prometheus.GetUpstreamRequestDurations(
+		addr,
+		start,
+		end,
+		workload,
+	)
+	if err != nil {
+		return workloads, err
+	}
+
+	// Iterate on source workload dimension
+	for _, sampleStream := range matrixByDestination {
+		metric := sampleStream.Metric
+		statuses := getWorkloadBySampleStream(
+			sampleStream,
 			start,
-			end,
+			statusStep,
+		)
+
+		workload := Workload{
+			Name:     string(metric["source_workload"]),
+			App:      string(metric["source_app"]),
+			Statuses: statuses,
+		}
+
+		workloads = append(
+			workloads,
 			workload,
 		)
-		if err != nil {
-			result.Error = err
-			results <- result
-			return
-		}
+	}
 
-		// Iterate on destination workload dimension
-		for _, sampleStream := range matrix {
-			metric := sampleStream.Metric
-			statuses := getWorkloadBySampleStream(
-				sampleStream,
-				start,
-				statusStep,
-			)
-
-			destinationWorkload := Workload{
-				Name:     string(metric["destination_workload"]),
-				App:      string(metric["destination_app"]),
-				Statuses: statuses,
-			}
-
-			result.Workloads = append(
-				result.Workloads,
-				destinationWorkload,
-			)
-		}
-		results <- result
-	}()
-
-	return results
+	return workloads, nil
 }
 
-// Get status by destination
-func getStatusByDestination(
+// Returns statuses for given workload
+func getStatuses(
 	addr string,
 	start time.Time,
 	end time.Time,
 	statusStep time.Duration,
 	workload string,
-) chan workloadsResult {
-	results := make(chan workloadsResult)
-	result := workloadsResult{}
+) ([]AggregatedStatusItem, error) {
+	matrix, err := prometheus.GetStatuses(
+		addr,
+		start,
+		end,
+		workload,
+	)
+	if err != nil {
+		return make([]AggregatedStatusItem, 0), err
+	}
 
-	go func() {
-		matrixByDestination, err := prometheus.GetStatusByDestination(
-			addr,
+	if len(matrix) > 0 {
+		statuses := getWorkloadBySampleStream(
+			matrix[0],
 			start,
-			end,
-			workload,
+			statusStep,
 		)
-		if err != nil {
-			result.Error = err
-			results <- result
-			return
-		}
-
-		// Iterate on source workload dimension
-		for _, sampleStream := range matrixByDestination {
-			metric := sampleStream.Metric
-			statuses := getWorkloadBySampleStream(
-				sampleStream,
-				start,
-				statusStep,
-			)
-
-			sourceWorkload := Workload{
-				Name:     string(metric["source_workload"]),
-				App:      string(metric["source_app"]),
-				Statuses: statuses,
-			}
-
-			result.Workloads = append(
-				result.Workloads,
-				sourceWorkload,
-			)
-		}
-		results <- result
-	}()
-
-	return results
-}
-
-func getStatus(
-	addr string,
-	start time.Time,
-	end time.Time,
-	statusStep time.Duration,
-	workload string,
-) chan workloadStatusesResult {
-	results := make(chan workloadStatusesResult)
-
-	go func() {
-		result := workloadStatusesResult{}
-
-		matrix, err := prometheus.GetStatus(
-			addr,
-			start,
-			end,
-			workload,
-		)
-		if err != nil {
-			result.Error = err
-			results <- result
-			return
-		}
-
-		fmt.Println(workload)
-
-		if len(matrix) > 0 {
-			statuses := getWorkloadBySampleStream(
-				matrix[0],
-				start,
-				statusStep,
-			)
-			result.StatusItems = statuses
-		} else {
-			result.StatusItems = make([]AggregatedStatusItem, 0)
-		}
-		results <- result
-	}()
-
-	return results
+		return statuses, nil
+	}
+	return make([]AggregatedStatusItem, 0), nil
 }
 
 func getWorkloadBySampleStream(

@@ -16,9 +16,9 @@ func TestApiGetWorkloadStatus(t *testing.T) {
 	workloadName := "productpage-v1"
 
 	mockServer := fixtures.PrometheusResponseStub(t, map[string]string{
-		prometheus.GetStatusBySourceQuery(workloadName):      "./mock/prom_workload_status_source.json",
-		prometheus.GetStatusByDestinationQuery(workloadName): "./mock/prom_workload_status_destination.json",
-		prometheus.GetStatusQuery(workloadName):              "./mock/prom_workload_status_destination.json",
+		prometheus.GetDownstreamRequestDurationsQuery(workloadName): "./mock/prom_workload_status_source.json",
+		prometheus.GetUpstreamRequestDurationsQuery(workloadName):   "./mock/prom_workload_status_destination.json",
+		prometheus.GetStatusesQuery(workloadName):                   "./mock/prom_workload_status_destination.json",
 	})
 	defer mockServer.Close()
 

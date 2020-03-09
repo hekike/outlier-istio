@@ -30,19 +30,20 @@ const workloadRequestDurationPercentilesTemplate = `
 // data resolution in Prometheus (Istio default is 5s)
 const resolutionStep = 5 * time.Second
 
-// GetStatusBySource returns statuses by source
-func GetStatusBySource(
+// GetDownstreamRequestDurations returns request durations for workloads called
+// from the given workload.
+func GetDownstreamRequestDurations(
 	addr string,
 	start time.Time,
 	end time.Time,
 	workload string,
 ) (model.Matrix, error) {
-	query := GetStatusBySourceQuery(workload)
+	query := GetDownstreamRequestDurationsQuery(workload)
 	return executeQueryRange(addr, start, end, query)
 }
 
-// GetStatusBySourceQuery returns statuses by source query
-func GetStatusBySourceQuery(workload string) string {
+// GetDownstreamRequestDurationsQuery returns a Prometheus query
+func GetDownstreamRequestDurationsQuery(workload string) string {
 	return fmt.Sprintf(
 		workloadRequestDurationPercentilesTemplate,
 		"source",
@@ -52,19 +53,20 @@ func GetStatusBySourceQuery(workload string) string {
 	)
 }
 
-// GetStatusByDestination returns statuses by destination
-func GetStatusByDestination(
+// GetUpstreamRequestDurations returns request durations for requests made to
+// given workload from sources.
+func GetUpstreamRequestDurations(
 	addr string,
 	start time.Time,
 	end time.Time,
 	workload string,
 ) (model.Matrix, error) {
-	query := GetStatusByDestinationQuery(workload)
+	query := GetUpstreamRequestDurationsQuery(workload)
 	return executeQueryRange(addr, start, end, query)
 }
 
-// GetStatusByDestinationQuery returns statuses by destination query
-func GetStatusByDestinationQuery(workload string) string {
+// GetUpstreamRequestDurationsQuery returns a Prometheus query
+func GetUpstreamRequestDurationsQuery(workload string) string {
 	return fmt.Sprintf(
 		workloadRequestDurationPercentilesTemplate,
 		"destination",
@@ -74,19 +76,19 @@ func GetStatusByDestinationQuery(workload string) string {
 	)
 }
 
-// GetStatus returns a query
-func GetStatus(
+// GetStatuses returns statuses for given workload
+func GetStatuses(
 	addr string,
 	start time.Time,
 	end time.Time,
 	workload string,
 ) (model.Matrix, error) {
-	query := GetStatusQuery(workload)
+	query := GetStatusesQuery(workload)
 	return executeQueryRange(addr, start, end, query)
 }
 
-// GetStatusQuery returns a status query
-func GetStatusQuery(workload string) string {
+// GetStatusesQuery returns statuses query for given workload
+func GetStatusesQuery(workload string) string {
 	return fmt.Sprintf(
 		workloadRequestDurationPercentilesTemplate,
 		"destination",
