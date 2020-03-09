@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/hekike/outlier-istio/pkg/models"
+	"github.com/hekike/outlier-istio/pkg/prometheus"
 	"github.com/hekike/outlier-istio/test/fixtures"
 	"github.com/stretchr/testify/assert"
 )
@@ -15,9 +16,9 @@ func TestApiGetWorkloadStatus(t *testing.T) {
 	workloadName := "productpage-v1"
 
 	mockServer := fixtures.PrometheusResponseStub(t, map[string]string{
-		models.GetStatusQueryByDestination(workloadName): "./mock/prom_workload_status_destination.json",
-		models.GetStatusQueryBySource(workloadName):      "./mock/prom_workload_status_source.json",
-		models.GetStatusQuery(workloadName):              "./mock/prom_workload_status_destination.json",
+		prometheus.GetStatusBySourceQuery(workloadName):      "./mock/prom_workload_status_source.json",
+		prometheus.GetStatusByDestinationQuery(workloadName): "./mock/prom_workload_status_destination.json",
+		prometheus.GetStatusQuery(workloadName):              "./mock/prom_workload_status_destination.json",
 	})
 	defer mockServer.Close()
 

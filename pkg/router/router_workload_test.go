@@ -7,13 +7,14 @@ import (
 	"testing"
 
 	"github.com/hekike/outlier-istio/pkg/models"
+	"github.com/hekike/outlier-istio/pkg/prometheus"
 	"github.com/hekike/outlier-istio/test/fixtures"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestApiGetWorkloads(t *testing.T) {
 	mockServer := fixtures.PrometheusResponseStub(t, map[string]string{
-		models.GetWorkloadQuery(): "./mock/prom_workloads.json",
+		prometheus.GetRequestsTotalByWorkloadsQuery(): "./mock/prom_workloads.json",
 	})
 	defer mockServer.Close()
 
