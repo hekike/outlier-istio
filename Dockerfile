@@ -1,4 +1,4 @@
-FROM golang:1.11
+FROM golang:1.13
 
 ENV PROMETHEUS_HOST "http://prometheus.istio-system.svc.cluster.local:9090"
 ENV WEB_DIST_VERSION "v1.0.0-alpha.12"
