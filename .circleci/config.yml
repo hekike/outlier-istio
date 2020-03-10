@@ -5,7 +5,7 @@ jobs:
       - image: golang:1.13
     steps:
       - checkout
-      - run: go get -u
+      - run: go get -v all
       - run: make test
 
   deploy:
