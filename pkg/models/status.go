@@ -40,7 +40,7 @@ type AggregatedStatusItem struct {
 func (as *AggregatedStatus) AddSample(
 	t time.Time,
 	v float64,
-) map[unixTime]AggregatedStatusItem {
+) {
 	var statusItem AggregatedStatusItem
 
 	// Map time to closest step
@@ -64,7 +64,6 @@ func (as *AggregatedStatus) AddSample(
 
 	// Store status item
 	as.StatusTimeline[timeKey] = statusItem
-	return as.StatusTimeline
 }
 
 // Aggregate turns the map to an aggregated array.
