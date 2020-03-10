@@ -16,7 +16,7 @@ func executeQuery(addr string, pq string) (promModel.Vector, error) {
 	}
 	api := promApiV1.NewAPI(client)
 
-	val, err := api.Query(context.Background(), pq, time.Now())
+	val, _, err := api.Query(context.Background(), pq, time.Now())
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +43,7 @@ func executeQueryRange(
 		End:   end,
 		Step:  resolutionStep,
 	}
-	val, err := api.QueryRange(context.Background(), pq, queryRange)
+	val, _, err := api.QueryRange(context.Background(), pq, queryRange)
 	if err != nil {
 		return nil, err
 	}
