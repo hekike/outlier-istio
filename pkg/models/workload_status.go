@@ -20,10 +20,10 @@ func GetWorkloadStatusByName(
 	name string,
 	start time.Time,
 	end time.Time,
-	historical time.Duration,
+	/** we fetch historical values for baseline calculation */
+	historicalStart time.Time,
 	statusStep time.Duration,
 ) (*Workload, error) {
-	historicalStart := start.Add(-historical)
 	workload := Workload{
 		Name:         name,
 		Statuses:     make([]AggregatedStatusItem, 0),

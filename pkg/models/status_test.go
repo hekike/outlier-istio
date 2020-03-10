@@ -59,10 +59,10 @@ func TestAggregate(t *testing.T) {
 	var historicalSampleValues statistics.Measurements = statistics.Measurements{10, 11, 12, 13, 12, 11}
 	statuses := status.Aggregate(historicalSampleValues)
 
-	am1 := 12.0
+	am1 := 11.5
 	avg1 := 12.6667
 	median1 := 11.5
-	am2 := 11.0
+	am2 := 12.0
 	avg2 := 14.8
 	median2 := 15.0
 	assert.Equal(t, []AggregatedStatusItem{

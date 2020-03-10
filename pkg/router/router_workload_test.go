@@ -14,7 +14,7 @@ import (
 
 func TestApiGetWorkloads(t *testing.T) {
 	mockServer := fixtures.PrometheusResponseStub(t, map[string]string{
-		prometheus.GetRequestsTotalByWorkloadsQuery(): "./mock/prom_workloads.json",
+		prometheus.GetRequestsTotalByWorkloadsQuery(): "../../test/mock/prom_workload_request_totals.json",
 	})
 	defer mockServer.Close()
 

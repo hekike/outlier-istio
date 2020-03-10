@@ -100,11 +100,13 @@ func (as *AggregatedStatus) Aggregate(
 		// for the moving window
 		var approximateMedian float64
 
-		if len(historicalSampleValues) > 5 {
-			approximateMedian = statistics.ApproximateMedian(historicalSampleValues)
-		}
+		// We add current values to historical values before we calculate the
+		// approximate median
 		for _, value := range statusItem.Values {
 			historicalSampleValues = append(historicalSampleValues, value)
+		}
+		if len(historicalSampleValues) > 5 {
+			approximateMedian = statistics.ApproximateMedian(historicalSampleValues)
 		}
 
 		// Store statistical results
@@ -161,7 +163,8 @@ func calculateStatusesBySamples(
 		if time.Unix() > start.Unix() {
 			aggregatedStatus.AddSample(time, value)
 		} else {
-			// Historical value
+			// If happened before start time, it's a historical value for
+			// baseline calculation
 			// TODO: is it valid to skip?
 			if !math.IsNaN(value) {
 				historicalSampleValues = append(

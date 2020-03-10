@@ -92,6 +92,7 @@ func RegisterRouteGroupWorkloadStatus(promAddr string, r *gin.RouterGroup) {
 		}
 
 		historical := time.Duration(status.Historical) * time.Minute
+		historicalStart := status.Start.Add(-historical)
 		statusStep := time.Duration(status.StatusStep) * time.Minute
 
 		// Get data
@@ -100,7 +101,7 @@ func RegisterRouteGroupWorkloadStatus(promAddr string, r *gin.RouterGroup) {
 			name,
 			status.Start,
 			status.End,
-			historical,
+			historicalStart,
 			statusStep,
 		)
 		if err != nil {
