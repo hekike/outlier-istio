@@ -1,18 +1,12 @@
-package utils
+package statistics
 
 import (
 	"math"
 )
 
-type SliceFloat64 []float64
-
-func (a SliceFloat64) Len() int           { return len(a) }
-func (a SliceFloat64) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a SliceFloat64) Less(i, j int) bool { return a[i] < a[j] }
-
 // ApproximateMedian returns with an approximate median
 // http://www.dmi.unict.it/~battiato/download/MedianLNCS.pdf
-func ApproximateMedian(A SliceFloat64) float64 {
+func ApproximateMedian(A Measurements) float64 {
 	size := len(A)
 	step := 1
 	r := int(math.Round(root(float64(size), 3)))
@@ -28,7 +22,7 @@ func ApproximateMedian(A SliceFloat64) float64 {
 	return A[(size-1)/2]
 }
 
-func tripletAdjut(A SliceFloat64, i int, step int) SliceFloat64 {
+func tripletAdjut(A Measurements, i int, step int) Measurements {
 	size := len(A)
 	j := i + step
 	k := i + 2
@@ -76,13 +70,4 @@ func root(a float64, n int) float64 {
 		}
 	}
 	return x
-}
-
-// Avg calculates the average
-func Avg(xs SliceFloat64) float64 {
-	total := 0.0
-	for _, v := range xs {
-		total += v
-	}
-	return total / float64(len(xs))
 }

@@ -14,7 +14,7 @@ func PrometheusResponseStub(t *testing.T, filename map[string]string) *httptest.
 		w http.ResponseWriter,
 		r *http.Request,
 	) {
-		json, err := ioutil.ReadFile(filename[r.URL.Query().Get("query")])
+		json, err := ioutil.ReadFile(filename[r.FormValue("query")])
 		if err != nil {
 			t.Error(err)
 		}

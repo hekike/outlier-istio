@@ -2,10 +2,10 @@ version: 2
 jobs:
   build:
     docker:
-      - image: golang:1.11
+      - image: golang:1.13
     steps:
       - checkout
-      - run: go get -u
+      - run: go get -v all
       - run: make test
 
   deploy:
