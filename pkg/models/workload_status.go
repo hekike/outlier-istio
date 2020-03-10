@@ -1,16 +1,18 @@
 package models
 
 import (
-	"math"
-	"sort"
 	"sync"
 	"time"
 
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/hekike/outlier-istio/pkg/prometheus"
-	"github.com/hekike/outlier-istio/pkg/statistics"
-	promModel "github.com/prometheus/common/model"
 )
+
+// WorkloadStatus struct.
+type WorkloadStatus struct {
+	Time   time.Time `json:"date"`
+	Status string    `json:"status"`
+}
 
 // GetWorkloadStatusByName returns a single workload with it's status.
 func GetWorkloadStatusByName(
@@ -115,15 +117,16 @@ func getDownstreams(
 	// Iterate on destination workload dimension
 	for _, sampleStream := range matrix {
 		metric := sampleStream.Metric
-		statuses := getStatusesBySampleStream(
-			sampleStream,
+		statuses := calculateStatusesBySamples(
+			sampleStream.Values,
 			start,
 			statusStep,
 		)
+		name, app := getDestinationFromMetric(metric)
 
 		workload := Workload{
-			Name:     string(metric["destination_workload"]),
-			App:      string(metric["destination_app"]),
+			Name:     name,
+			App:      app,
 			Statuses: statuses,
 		}
 
@@ -159,15 +162,16 @@ func getUpstreams(
 	// Iterate on source workload dimension
 	for _, sampleStream := range matrixByDestination {
 		metric := sampleStream.Metric
-		statuses := getStatusesBySampleStream(
-			sampleStream,
+		statuses := calculateStatusesBySamples(
+			sampleStream.Values,
 			start,
 			statusStep,
 		)
 
+		name, app := getSourceFromMetric(metric)
 		workload := Workload{
-			Name:     string(metric["source_workload"]),
-			App:      string(metric["source_app"]),
+			Name:     name,
+			App:      app,
 			Statuses: statuses,
 		}
 
@@ -199,55 +203,12 @@ func getStatuses(
 	}
 
 	if len(matrix) > 0 {
-		statuses := getStatusesBySampleStream(
-			matrix[0],
+		statuses := calculateStatusesBySamples(
+			matrix[0].Values,
 			start,
 			statusStep,
 		)
 		return statuses, nil
 	}
 	return make([]AggregatedStatusItem, 0), nil
-}
-
-// Calculates statuses based on samples
-func getStatusesBySampleStream(
-	sampleStream *promModel.SampleStream,
-	start time.Time,
-	statusStep time.Duration,
-) []AggregatedStatusItem {
-	values := sampleStream.Values
-	historicalSampleValues := statistics.Measurements{}
-
-	aggregatedStatus := AggregatedStatus{
-		Step:   statusStep,
-		Status: make(map[int64]AggregatedStatusItem),
-	}
-
-	// Sort sample pairs
-	sort.Slice(values, func(i, j int) bool {
-		return values[i].Timestamp.Time().Unix() <
-			values[j].Timestamp.Time().Unix()
-	})
-
-	// Iterate on time dimension
-	for _, samplePair := range values {
-		t := samplePair.Timestamp.Time()
-		v := float64(samplePair.Value)
-
-		// Value in the current range
-		if t.Unix() > start.Unix() {
-			aggregatedStatus.AddStatus(t, v)
-		} else {
-			// Historical value
-			// TODO: is it valid to skip?
-			if !math.IsNaN(v) {
-				historicalSampleValues = append(
-					historicalSampleValues,
-					v,
-				)
-			}
-		}
-	}
-	statuses := aggregatedStatus.Aggregate(historicalSampleValues)
-	return statuses
 }

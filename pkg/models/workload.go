@@ -1,15 +1,5 @@
 package models
 
-import (
-	"time"
-)
-
-// WorkloadStatus struct.
-type WorkloadStatus struct {
-	Time   time.Time `json:"date"`
-	Status string    `json:"status"`
-}
-
 // Workload struct.
 type Workload struct {
 	Name         string                 `json:"name"`          // name of the workload

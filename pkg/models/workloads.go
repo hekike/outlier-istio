@@ -22,12 +22,13 @@ func GetWorkloads(addr string) (map[string]Workload, error) {
 		// Get workload
 		var id string
 		var workload Workload
-		id, workload = getWorkloadByMetric(metric, "source", workloads)
+		id, workload = getSourceWorkloadByMetric(metric, workloads)
 
 		// Add destination workload
+		name, app := getDestinationFromMetric(metric)
 		destinationWorkload := Workload{
-			Name: string(metric["destination_workload"]),
-			App:  string(metric["destination_app"]),
+			Name: name,
+			App:  app,
 		}
 		workload.AddDestination(destinationWorkload)
 
@@ -40,16 +41,13 @@ func GetWorkloads(addr string) (map[string]Workload, error) {
 		// Get workload
 		var id string
 		var workload Workload
-		id, workload = getWorkloadByMetric(
-			metric,
-			"destination",
-			workloads,
-		)
+		id, workload = getDestinationWorkloadByMetric(metric, workloads)
 
 		// Add source workload
+		name, app := getSourceFromMetric(metric)
 		sourceWorkload := Workload{
-			Name: string(metric["source_workload"]),
-			App:  string(metric["source_app"]),
+			Name: name,
+			App:  app,
 		}
 		workload.AddSource(sourceWorkload)
 
@@ -57,6 +55,20 @@ func GetWorkloads(addr string) (map[string]Workload, error) {
 	}
 
 	return workloads, nil
+}
+
+func getSourceWorkloadByMetric(metric promModel.Metric, workloads map[string]Workload) (
+	id string,
+	workload Workload,
+) {
+	return getWorkloadByMetric(metric, "source", workloads)
+}
+
+func getDestinationWorkloadByMetric(metric promModel.Metric, workloads map[string]Workload) (
+	id string,
+	workload Workload,
+) {
+	return getWorkloadByMetric(metric, "destination", workloads)
 }
 
 func getWorkloadByMetric(
@@ -70,11 +82,9 @@ func getWorkloadByMetric(
 	// Extract data
 	var name, app string
 	if sourceType == "source" {
-		name = string(metric["source_workload"])
-		app = string(metric["source_app"])
+		name, app = getSourceFromMetric(metric)
 	} else {
-		name = string(metric["destination_workload"])
-		app = string(metric["destination_app"])
+		name, app = getDestinationFromMetric(metric)
 	}
 
 	// Find or create workload
